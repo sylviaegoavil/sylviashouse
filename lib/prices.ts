@@ -1,0 +1,15 @@
+export const DEFAULT_PRICES: Record<string, number> = {
+  ALMUERZO: 18.0,
+  CENA: 18.0,
+  "ALMUERZO ESPECIAL": 22.0,
+  "CENA ESPECIAL": 22.0,
+  "ALMUERZO STAFF": 18.0,
+  CAFÉ: 30.0,
+  "TORTA GRANDE": 125.0,
+  "TORTA MEDIANA": 100.0,
+  BOCADITOS: 2.0,
+  "GASEOSA 3L": 15.0,
+  "GASEOSA 600 ml": 3.5,
+  "GASEOSAS 500ml": 3.5,
+  "REPOSICIÓN THERMO": 100.0,
+};
