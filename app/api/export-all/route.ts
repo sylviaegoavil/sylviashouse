@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     const zipBuffer = Buffer.concat(chunks);
 
-    return new Response(zipBuffer, {
+    return new Response(new Uint8Array(zipBuffer), {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="SylviasHouse_${monthLabel}_${year}.zip"`,
