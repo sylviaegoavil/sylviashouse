@@ -13,7 +13,7 @@ interface AuditEntry {
   entity_id: string | null;
   details: Record<string, unknown> | null;
   created_at: string;
-  users: { email: string } | null;
+  users: { email: string }[] | null;
 }
 
 const ACTION_COLOR: Record<string, string> = {
@@ -77,7 +77,7 @@ export default function AuditPage() {
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {e.users?.email ?? "Sistema"} · {new Date(e.created_at).toLocaleString("es-PE")}
+                        {e.users?.[0]?.email ?? "Sistema"} · {new Date(e.created_at).toLocaleString("es-PE")}
                       </p>
                     </div>
                   </div>

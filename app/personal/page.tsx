@@ -67,7 +67,7 @@ export default function PersonalPage() {
       .select("id, full_name, doc_number, group_id, groups(name)")
       .eq("is_active", true)
       .order("full_name");
-    setWorkers((data ?? []) as Worker[]);
+    setWorkers((data ?? []) as unknown as Worker[]);
     setLoadingWorkers(false);
   }, []);
 

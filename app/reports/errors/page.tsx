@@ -84,7 +84,7 @@ export default function ErrorReportPage() {
 
       if (!error && data) {
         const map = new Map<string, WorkerErrorCount>();
-        for (const e of data as ErrorRow[]) {
+        for (const e of data as unknown as ErrorRow[]) {
           const key = e.worker_id ?? `unmatched:${e.raw_text.slice(0, 30)}`;
           if (!map.has(key)) {
             map.set(key, {

@@ -63,7 +63,7 @@ async function fetchAllOrderPages(
       .gte("order_date", gte)
       .lte("order_date", lte)
       .range(from, from + PAGE - 1);
-    if (data) all.push(...(data as OrderRow[]));
+    if (data) all.push(...(data as unknown as OrderRow[]));
     if (!data || data.length < PAGE) break;
     from += PAGE;
   }
