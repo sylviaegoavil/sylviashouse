@@ -168,7 +168,7 @@ function calcSoda500ml(
   month: number,
   produccionOrders: WorkerOrder[],
   produccionWorkers: { id: string; full_name: string }[],
-  fixedCenas: number,
+  cenasDailyQty: Record<string, number>,
   adicionalesProduccion: Record<string, number>
 ): Record<string, number> {
   const days = getDaysInMonth(year, month);
@@ -192,8 +192,8 @@ function calcSoda500ml(
     const dow = date.getDay(); // 0=Sun, 6=Sat
 
     if (dow === 6) {
-      // Saturday: use cenas count
-      result[ds] = fixedCenas;
+      // Saturday: use actual manual cenas count for that day
+      result[ds] = cenasDailyQty[ds] || 0;
     } else if (dow === 0) {
       // Sunday: use almuerzos count
       result[ds] = dailyTotals[ds] || 0;
@@ -623,7 +623,7 @@ export async function generateExcelProduccion(input: ExcelInput): Promise<Buffer
   wb.creator = "Sylvia's House";
   wb.created = new Date();
 
-  const { month, year, orders, workers, adicionales, manualProducts, specialOrders, prices, fixedCenas, fixedCafe } = input;
+  const { month, year, orders, workers, adicionales, manualProducts, specialOrders, prices, fixedCafe } = input;
   const days = getDaysInMonth(year, month);
 
   const prodOrders = orders["PRODUCCION"] || [];
@@ -643,11 +643,8 @@ export async function generateExcelProduccion(input: ExcelInput): Promise<Buffer
     staffDailyTotals[ds] = (staffDailyTotals[ds] || 0) + (adicStaff[ds] || 0);
   }
 
-  // Fixed cenas (25 per day by default)
-  const cenasDailyQty: Record<string, number> = {};
-  for (let d = 1; d <= days; d++) {
-    cenasDailyQty[dateStr(year, month, d)] = fixedCenas;
-  }
+  // Cenas from manual products (entered day-by-day via /products)
+  const cenasDailyQty = buildManualProductDailyQty(manualProducts, "CENAS PRODUCCIÓN", year, month);
 
   // Fixed cafe (2 per day by default)
   const cafeDailyQty: Record<string, number> = {};
@@ -655,17 +652,23 @@ export async function generateExcelProduccion(input: ExcelInput): Promise<Buffer
     cafeDailyQty[dateStr(year, month, d)] = fixedCafe;
   }
 
-  // Auto soda 500ml
-  const soda500mlQty = calcSoda500ml(year, month, prodOrders, prodWorkers, fixedCenas, adicProd);
+  // Auto soda 500ml (Saturdays use actual cenas count)
+  const soda500mlQty = calcSoda500ml(year, month, prodOrders, prodWorkers, cenasDailyQty, adicProd);
+
+  // Combined almuerzos: PRODUCCION + STAFF summed per day (consolidado only)
+  const combinedAlmuerzosDailyQty: Record<string, number> = {};
+  for (let d = 1; d <= days; d++) {
+    const ds = dateStr(year, month, d);
+    combinedAlmuerzosDailyQty[ds] = (prodDailyTotals[ds] || 0) + (staffDailyTotals[ds] || 0);
+  }
 
   const prodSpecialRows: ConsolidadoRow[] = specialOrders
     .filter((s) => s.groupName === "PRODUCCION" || s.groupName === "STAFF")
     .map((s) => ({ concept: s.label.toUpperCase(), dailyQty: s.dailyQty, unitPrice: s.price }));
 
   const consolidadoRows: ConsolidadoRow[] = [
-    { concept: "ALMUERZOS PRODUCCIÓN", dailyQty: prodDailyTotals, unitPrice: prices["ALMUERZO"] || 0 },
+    { concept: "ALMUERZOS PRODUCCIÓN", dailyQty: combinedAlmuerzosDailyQty, unitPrice: prices["ALMUERZO"] || 0 },
     { concept: "CENAS PRODUCCIÓN", dailyQty: cenasDailyQty, unitPrice: prices["CENA"] || 0 },
-    { concept: "ALMUERZOS STAFF", dailyQty: staffDailyTotals, unitPrice: prices["ALMUERZO STAFF"] || prices["ALMUERZO"] || 0 },
     ...prodSpecialRows,
     { concept: "CAFÉ", dailyQty: cafeDailyQty, unitPrice: prices["CAFÉ"] || 30 },
     { concept: "GASEOSAS 500ml", dailyQty: soda500mlQty, unitPrice: prices["GASEOSAS 500ml"] || 3.5 },
