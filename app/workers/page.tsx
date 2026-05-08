@@ -36,15 +36,24 @@ import {
   Edit,
   UserCheck,
   UserX,
+  Trash2,
 } from "lucide-react";
 import type { Group, Worker } from "@/lib/types";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function WorkersPage() {
+  const { profile } = useAuth();
+  const isSuperAdmin = profile?.role === "super_admin";
+
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Delete modal: worker + optional orderCount (set when API returns 409)
+  const [deleteModal, setDeleteModal] = useState<{ worker: Worker; orderCount?: number } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Add/edit dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -158,6 +167,29 @@ export default function WorkersPage() {
       loadWorkers();
     } catch {
       toast.error("Error de conexion");
+    }
+  };
+
+  // Delete worker
+  const handleDeleteConfirm = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/workers?id=${deleteModal.worker.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (res.status === 409) {
+        setDeleteModal({ ...deleteModal, orderCount: data.orderCount });
+      } else if (res.ok) {
+        toast.success(`${deleteModal.worker.full_name} eliminado`);
+        setDeleteModal(null);
+        loadWorkers();
+      } else {
+        toast.error(data.error ?? "Error al eliminar");
+      }
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -309,6 +341,16 @@ export default function WorkersPage() {
                             <UserCheck className="h-4 w-4" />
                           )}
                         </Button>
+                        {isSuperAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => setDeleteModal({ worker: w })}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -318,6 +360,49 @@ export default function WorkersPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete confirmation modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg border shadow-lg w-full max-w-sm p-6 space-y-4">
+            {deleteModal.orderCount !== undefined ? (
+              <>
+                <h2 className="font-semibold text-base">No se puede eliminar</h2>
+                <p className="text-sm text-muted-foreground">
+                  <strong>{deleteModal.worker.full_name}</strong> tiene{" "}
+                  <strong>{deleteModal.orderCount} pedido{deleteModal.orderCount !== 1 ? "s" : ""}</strong> registrados.
+                  No se puede eliminar, solo desactivar.
+                </p>
+                <div className="flex justify-end">
+                  <Button variant="outline" onClick={() => setDeleteModal(null)}>Cerrar</Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="font-semibold text-base flex items-center gap-2 text-red-700">
+                  <Trash2 className="h-4 w-4" /> Eliminar trabajador
+                </h2>
+                <p className="text-sm">
+                  ¿Eliminar a <strong>{deleteModal.worker.full_name}</strong>?{" "}
+                  Esta acción no se puede deshacer.
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={() => setDeleteModal(null)} disabled={deleting}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    onClick={handleDeleteConfirm}
+                    disabled={deleting}
+                  >
+                    {deleting ? "Eliminando..." : "Eliminar"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

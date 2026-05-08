@@ -1,13 +1,15 @@
 /**
  * Workers CRUD API
  *
- * GET  /api/workers?groupId=xxx   — list workers for a group
- * POST /api/workers               — create a worker
- * PUT  /api/workers               — update a worker
+ * GET    /api/workers?groupId=xxx  — list workers for a group
+ * POST   /api/workers              — create a worker
+ * PUT    /api/workers              — update a worker
+ * DELETE /api/workers?id=xxx       — delete worker (super_admin only, fails if has orders)
  */
 
 import { NextRequest } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getAuthContext } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -105,6 +107,31 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function DELETE(request: NextRequest) {
+  const ctx = await getAuthContext();
+  if (!ctx || ctx.profile.role !== "super_admin") {
+    return Response.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  const id = request.nextUrl.searchParams.get("id");
+  if (!id) return Response.json({ error: "Falta id" }, { status: 400 });
+
+  const supabase = createServerSupabaseClient();
+
+  const { count } = await supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("worker_id", id);
+
+  if (count && count > 0) {
+    return Response.json({ error: "Tiene pedidos", orderCount: count }, { status: 409 });
+  }
+
+  const { error } = await supabase.from("workers").delete().eq("id", id);
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+  return Response.json({ deleted: true });
 }
 
 export async function PUT(request: NextRequest) {
