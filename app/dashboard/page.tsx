@@ -19,10 +19,16 @@ const MONTHS_ES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const GROUP_COLORS = [
-  "#d97706", "#ea580c", "#ca8a04", "#16a34a", "#0284c7", "#7c3aed",
-  "#db2777", "#059669",
-];
+const GROUP_COLOR_MAP: Record<string, string> = {
+  "APT ALMUERZOS":   "#3B82F6",
+  "APT CENAS":       "#EF4444",
+  "PATIO ALMUERZOS": "#22C55E",
+  "PATIO CENAS":     "#EAB308",
+  "PRODUCCIÓN":      "#8B5CF6",
+  "STAFF":           "#F97316",
+};
+const FALLBACK_COLORS = ["#d97706", "#ea580c", "#ca8a04", "#16a34a", "#0284c7", "#7c3aed"];
+const groupColor = (name: string, i: number) => GROUP_COLOR_MAP[name] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length];
 
 interface GroupInfo {
   id: string;
@@ -223,7 +229,24 @@ export default function DashboardPage() {
     const orderDates = new Set(orders.map((o) => o.order_date));
     return new Set([...orderDates, ...allNoOrderDates]).size;
   }, [orders, noOrderDaysByGroup]);
-  const progressPct = workdays > 0 ? Math.round((daysLoaded / workdays) * 100) : 0;
+
+  // Group summary cards — moved here to feed the general progress calculation
+  const groupCards = useMemo(() => groups.map((g) => {
+    const gOrders = orders.filter((o) => o.group_id === g.id);
+    const gOrderDates = new Set(gOrders.map((o) => o.order_date));
+    const gNoOrderDates = noOrderDaysByGroup.get(g.id) ?? new Set<string>();
+    const gDays = new Set([...gOrderDates, ...gNoOrderDates]).size;
+    const gManualProducts = manualProductsByGroup.get(g.id) ?? {};
+    return { ...g, orderCount: gOrders.length, daysLoaded: gDays, isComplete: gDays >= workdays, manualProducts: gManualProducts };
+  }), [groups, orders, noOrderDaysByGroup, manualProductsByGroup, workdays]);
+
+  // General progress = average of each group's individual percentage (1 decimal)
+  const progressPct = useMemo(() => {
+    if (groupCards.length === 0 || workdays === 0) return 0;
+    const sum = groupCards.reduce((acc, g) => acc + Math.min(100, (g.daysLoaded / workdays) * 100), 0);
+    return Math.round((sum / groupCards.length) * 10) / 10;
+  }, [groupCards, workdays]);
+  const completeGroupsCount = useMemo(() => groupCards.filter((g) => g.isComplete).length, [groupCards]);
 
   const progressColor = progressPct > 90 ? "bg-green-500" : progressPct >= 50 ? "bg-yellow-400" : "bg-red-500";
   const progressTextColor = progressPct > 90 ? "text-green-700" : progressPct >= 50 ? "text-yellow-700" : "text-red-700";
@@ -245,16 +268,6 @@ export default function DashboardPage() {
   const prevProgressPct = prevWorkdays > 0 ? Math.round((prevDaysLoaded / prevWorkdays) * 100) : 100;
   const prevMissingDays = prevWorkdays - prevDaysLoaded;
   const showDeadlineBanner = !isReadonly && isCurrentMonth && nowRef.getDate() <= 10 && prevProgressPct < 100;
-
-  // Group summary cards
-  const groupCards = useMemo(() => groups.map((g) => {
-    const gOrders = orders.filter((o) => o.group_id === g.id);
-    const gOrderDates = new Set(gOrders.map((o) => o.order_date));
-    const gNoOrderDates = noOrderDaysByGroup.get(g.id) ?? new Set<string>();
-    const gDays = new Set([...gOrderDates, ...gNoOrderDates]).size;
-    const gManualProducts = manualProductsByGroup.get(g.id) ?? {};
-    return { ...g, orderCount: gOrders.length, daysLoaded: gDays, isComplete: gDays >= workdays, manualProducts: gManualProducts };
-  }), [groups, orders, noOrderDaysByGroup, manualProductsByGroup, workdays]);
 
   // Stacked bar chart data (per day)
   const barData = useMemo(() => {
@@ -376,10 +389,10 @@ export default function DashboardPage() {
         <CardContent className="pt-5 pb-5">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <p className="font-semibold">
-              {MONTHS_ES[selectedMonth]} {selectedYear} — {progressPct}% completado
+              {MONTHS_ES[selectedMonth]} {selectedYear} — {progressPct.toFixed(1)}% completado
             </p>
             <span className={`text-sm font-medium ${progressTextColor}`}>
-              {daysLoaded} de {workdays} días cargados
+              {completeGroupsCount} de {groupCards.length} grupos completos
             </span>
           </div>
           <div className="w-full h-3 bg-white/70 rounded-full overflow-hidden border border-white/50">
@@ -410,7 +423,7 @@ export default function DashboardPage() {
             </h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {groupCards.map((g, i) => {
-                const color = GROUP_COLORS[i % GROUP_COLORS.length];
+                const color = groupColor(g.name, i);
                 const pct = workdays > 0 ? Math.min(100, (g.daysLoaded / workdays) * 100) : 0;
                 return (
                   <Link key={g.id} href={`/groups/${g.id}`}>
@@ -483,7 +496,7 @@ export default function DashboardPage() {
                       key={g.id}
                       dataKey={g.name}
                       stackId="a"
-                      fill={GROUP_COLORS[i % GROUP_COLORS.length]}
+                      fill={groupColor(g.name, i)}
                     />
                   ))}
                 </BarChart>
