@@ -115,14 +115,15 @@ export default function ProductsPage() {
     async function loadBase() {
       setLoading(true);
       const supabase = createBrowserSupabaseClient();
-      const [{ data: pts }, { data: grps }] = await Promise.all([
+      const [{ data: pts }, grpsRes] = await Promise.all([
         supabase.from("manual_product_types").select("*").eq("is_active", true).order("name"),
-        supabase.from("groups").select("id, name, excel_group").order("name"),
+        fetch("/api/groups"),
       ]);
+      const grps: Group[] = grpsRes.ok ? await grpsRes.json() : [];
       setProductTypes(pts || []);
-      setGroups(grps || []);
+      setGroups(grps);
       if (pts?.length) setFormProductType(pts[0].id);
-      if (grps?.length) setFormGroup(grps[0].id);
+      if (grps.length) setFormGroup(grps[0].id);
       setLoading(false);
     }
     loadBase();

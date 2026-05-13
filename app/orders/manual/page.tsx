@@ -59,13 +59,14 @@ export default function ManualOrdersPage() {
   useEffect(() => {
     async function loadBase() {
       const supabase = createBrowserSupabaseClient();
-      const [{ data: grps }, { data: wrks }] = await Promise.all([
-        supabase.from("groups").select("id, name").order("name"),
+      const [grpsRes, { data: wrks }] = await Promise.all([
+        fetch("/api/groups"),
         supabase.from("workers").select("id, full_name, doc_number, group_id").eq("is_active", true).order("full_name"),
       ]);
-      setGroups(grps || []);
+      const grps: Group[] = grpsRes.ok ? await grpsRes.json() : [];
+      setGroups(grps);
       setWorkers(wrks || []);
-      if (grps?.length) setSelGroup(grps[0].id);
+      if (grps.length) setSelGroup(grps[0].id);
       setLoading(false);
     }
     loadBase();

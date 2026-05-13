@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { AttendanceGrid } from "@/components/AttendanceGrid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, RefreshCw, Trash2 } from "lucide-react";
 import type { Group, Worker, Order } from "@/lib/types";
 import type { ManualProductRow } from "@/components/AttendanceGrid";
 import { useAuth } from "@/components/AuthProvider";
@@ -35,6 +35,8 @@ export default function GroupDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  const [refreshing, setRefreshing] = useState(false);
 
   // No-order days
   const [noOrderDays, setNoOrderDays] = useState<Set<number>>(new Set());
@@ -224,17 +226,33 @@ export default function GroupDetailPage() {
             canMarkNoOrder={canMarkNoOrder}
             onToggleNoOrderDay={handleToggleNoOrderDay}
             extraHeaderActions={
-              isSuperAdmin ? (
+              <div className="flex items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-red-600 border-red-200 hover:bg-red-50 h-8"
-                  onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(""); }}
+                  className="h-8 w-8 p-0"
+                  title="Actualizar datos"
+                  onClick={async () => {
+                    setRefreshing(true);
+                    await loadOrders();
+                    setRefreshing(false);
+                  }}
+                  disabled={refreshing}
                 >
-                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                  Borrar mes
+                  <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
                 </Button>
-              ) : undefined
+                {isSuperAdmin && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600 border-red-200 hover:bg-red-50 h-8"
+                    onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(""); }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                    Borrar mes
+                  </Button>
+                )}
+              </div>
             }
           />
         </CardContent>
