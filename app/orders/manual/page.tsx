@@ -45,14 +45,16 @@ export default function ManualOrdersPage() {
 
   const loadOrders = useCallback(async () => {
     const supabase = createBrowserSupabaseClient();
-    const { data } = await supabase
+    let query = supabase
       .from("orders")
       .select(`id, order_date, source, notes, is_additional, special_price, special_label, workers(full_name, doc_number), groups(name)`)
       .eq("source", "manual")
       .eq("order_date", selDate || todayStr)
       .order("created_at", { ascending: false });
+    if (selGroup) query = query.eq("group_id", selGroup);
+    const { data } = await query;
     setOrders((data || []) as unknown as Order[]);
-  }, [selDate, todayStr]);
+  }, [selDate, selGroup, todayStr]);
 
   useEffect(() => {
     async function loadBase() {
@@ -287,6 +289,7 @@ export default function ManualOrdersPage() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               Pedidos manuales
+              {selGroup && <span className="font-normal text-muted-foreground">— {groups.find((g) => g.id === selGroup)?.name}</span>}
               <Badge variant="secondary">{orders.length}</Badge>
             </CardTitle>
             <p className="text-xs text-muted-foreground">
