@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { MonthSelector } from "./MonthSelector";
 import type { Worker, Order, Group } from "@/lib/types";
 
@@ -106,11 +106,40 @@ export function AttendanceGrid({
   const daysInMonth = new Date(year, monthNum, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // Only show workers with at least 1 order this month
-  const activeWorkers = useMemo(
+  const [search, setSearch] = useState("");
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+
+  // Reset day if month changes and day is out of range
+  useEffect(() => {
+    if (selectedDay && selectedDay > daysInMonth) setSelectedDay(null);
+  }, [daysInMonth, selectedDay]);
+
+  // Workers with at least 1 order this month
+  const workersWithOrders = useMemo(
     () => workers.filter((w) => orders.some((o) => o.worker_id === w.id && !o.is_additional)),
     [workers, orders]
   );
+
+  // Filter by search query
+  const activeWorkers = useMemo(() => {
+    if (!search) return workersWithOrders;
+    const q = search.toLowerCase();
+    return workersWithOrders.filter(
+      (w) => w.full_name.toLowerCase().includes(q) || w.doc_number.includes(q)
+    );
+  }, [workersWithOrders, search]);
+
+  // Orders for selected day (for detail panel)
+  const dayDetailOrders = useMemo(() => {
+    if (!selectedDay) return [];
+    const dayStr = `${year}-${String(monthNum).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`;
+    return orders
+      .filter((o) => o.order_date === dayStr)
+      .map((o) => {
+        const w = o.worker_id ? workers.find((wk) => wk.id === o.worker_id) : null;
+        return { ...o, workerName: w?.full_name ?? "ADICIONAL", docNumber: w?.doc_number ?? "—" };
+      });
+  }, [orders, selectedDay, year, monthNum, workers]);
 
   // Build lookup: workerId -> { dateKey -> Order[] }
   // Orders with is_additional=true (or null worker_id) are excluded — they go into adicPerDay.
@@ -194,12 +223,39 @@ export function AttendanceGrid({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-lg font-semibold">{group.excel_tab}</h3>
           <p className="text-sm text-muted-foreground">{group.name}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar por nombre o DNI..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="rounded-md border border-input px-3 py-1.5 text-sm w-52 pr-7 bg-background"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          {/* Day filter */}
+          <select
+            value={selectedDay ?? ""}
+            onChange={(e) => setSelectedDay(e.target.value ? Number(e.target.value) : null)}
+            className="rounded-md border border-input px-2 py-1.5 text-sm bg-background"
+          >
+            <option value="">Todos los días</option>
+            {days.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
           <MonthSelector value={month} onChange={onMonthChange} />
           {extraHeaderActions}
         </div>
@@ -225,8 +281,9 @@ export function AttendanceGrid({
                   <th
                     key={d}
                     className={`px-1 py-1 text-center min-w-[32px] ${
+                      selectedDay === d ? "bg-blue-100 ring-1 ring-inset ring-blue-300" :
                       isWeekend ? "bg-amber-50" : ""
-                    } ${isMarked ? "bg-gray-50" : ""}`}
+                    } ${isMarked && selectedDay !== d ? "bg-gray-50" : ""}`}
                   >
                     <div className="text-xs text-muted-foreground">
                       {DAY_NAMES_SHORT[dayOfWeek[i]]}
@@ -281,6 +338,7 @@ export function AttendanceGrid({
                       <td
                         key={d}
                         className={`px-1 py-1 text-center ${
+                          selectedDay === d ? "bg-blue-50" :
                           isWeekend ? "bg-amber-50/50" : ""
                         } ${
                           count > 0
@@ -310,6 +368,15 @@ export function AttendanceGrid({
                 </tr>
               );
             })}
+
+            {/* No results row */}
+            {search && activeWorkers.length === 0 && (
+              <tr className="border-t">
+                <td colSpan={daysInMonth + 3} className="px-4 py-4 text-center text-sm text-muted-foreground">
+                  No se encontró el trabajador
+                </td>
+              </tr>
+            )}
 
             {/* NN row (only for APT and PRODUCCION) */}
             {showNNRow && (
@@ -426,6 +493,49 @@ export function AttendanceGrid({
           </tbody>
         </table>
       </div>
+
+      {/* Day detail panel */}
+      {selectedDay !== null && (
+        <div className="rounded-lg border bg-blue-50/30 p-4 space-y-3">
+          <p className="text-sm font-semibold text-blue-900">
+            {dayDetailOrders.length} pedido{dayDetailOrders.length !== 1 ? "s" : ""} el día {selectedDay}
+          </p>
+          {dayDetailOrders.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin pedidos registrados para este día.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-left py-1.5 pr-4 font-medium">Nombre</th>
+                    <th className="text-left py-1.5 pr-4 font-medium">DNI</th>
+                    <th className="text-left py-1.5 pr-4 font-medium">Fuente</th>
+                    <th className="text-left py-1.5 font-medium">Notas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dayDetailOrders.map((o) => (
+                    <tr key={o.id} className="border-b last:border-0">
+                      <td className="py-1.5 pr-4 font-medium">{o.workerName}</td>
+                      <td className="py-1.5 pr-4 font-mono text-xs">{o.docNumber}</td>
+                      <td className="py-1.5 pr-4">
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          o.source === "whatsapp"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}>
+                          {o.source === "whatsapp" ? "WhatsApp" : "Manual"}
+                        </span>
+                      </td>
+                      <td className="py-1.5 text-muted-foreground">{o.notes ?? ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
