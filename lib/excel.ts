@@ -6,7 +6,6 @@
  */
 
 import ExcelJS from "exceljs";
-import { WORKERS_WITH_AUTO_SODA } from "./soda-config";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -159,54 +158,6 @@ function buildWorkerDailyMap(
     map[o.workerId][o.orderDate] = (map[o.workerId][o.orderDate] || 0) + o.count;
   }
   return map;
-}
-
-// ─── Auto-soda calculation for PRODUCCION ────────────────────────────────────
-
-function calcSoda500ml(
-  year: number,
-  month: number,
-  produccionOrders: WorkerOrder[],
-  produccionWorkers: { id: string; full_name: string }[],
-  cenasDailyQty: Record<string, number>,
-  adicionalesProduccion: Record<string, number>
-): Record<string, number> {
-  const days = getDaysInMonth(year, month);
-  const result: Record<string, number> = {};
-
-  // Find soda workers
-  const sodaWorkerIds = new Set<string>();
-  for (const w of produccionWorkers) {
-    const nameLower = w.full_name.toUpperCase();
-    if (WORKERS_WITH_AUTO_SODA.workerNames.some((n) => nameLower.includes(n))) {
-      sodaWorkerIds.add(w.id);
-    }
-  }
-
-  const workerDayMap = buildWorkerDailyMap(produccionOrders);
-  const dailyTotals = buildDailyTotals(produccionOrders, year, month);
-
-  for (let d = 1; d <= days; d++) {
-    const ds = dateStr(year, month, d);
-    const date = new Date(year, month - 1, d);
-    const dow = date.getDay(); // 0=Sun, 6=Sat
-
-    if (dow === 6) {
-      // Saturday: use actual manual cenas count for that day
-      result[ds] = cenasDailyQty[ds] || 0;
-    } else if (dow === 0) {
-      // Sunday: use almuerzos count
-      result[ds] = dailyTotals[ds] || 0;
-    } else {
-      // Mon–Fri: count soda workers who ordered
-      let count = 0;
-      for (const wId of sodaWorkerIds) {
-        if (workerDayMap[wId]?.[ds]) count++;
-      }
-      result[ds] = count;
-    }
-  }
-  return result;
 }
 
 // ─── Detail sheet (workers × days) ───────────────────────────────────────────
@@ -557,6 +508,29 @@ function buildManualProductDailyQty(
   return result;
 }
 
+// ─── Dynamic manual product rows (all products with data, excluding named ones) ─
+
+function buildDynamicManualRows(
+  manualProducts: ManualProductEntry[],
+  year: number,
+  month: number,
+  excludeNames: string[],
+  prices: Record<string, number>
+): ConsolidadoRow[] {
+  const seen = new Set<string>();
+  const rows: ConsolidadoRow[] = [];
+  for (const mp of manualProducts) {
+    if (seen.has(mp.productName) || excludeNames.includes(mp.productName)) continue;
+    seen.add(mp.productName);
+    rows.push({
+      concept: mp.productName,
+      dailyQty: buildManualProductDailyQty(manualProducts, mp.productName, year, month),
+      unitPrice: prices[mp.productName] ?? mp.unitPrice,
+    });
+  }
+  return rows;
+}
+
 // ─── APT WORKBOOK ─────────────────────────────────────────────────────────────
 
 export async function generateExcelAPT(input: ExcelInput): Promise<Buffer> {
@@ -592,12 +566,7 @@ export async function generateExcelAPT(input: ExcelInput): Promise<Buffer> {
     { concept: "ALMUERZOS", dailyQty: almuerzoDailyTotals, unitPrice: prices["ALMUERZO"] || 0 },
     { concept: "CENAS", dailyQty: cenaDailyTotals, unitPrice: prices["CENA"] || 0 },
     ...aptSpecialRows,
-    { concept: "CAFÉ", dailyQty: buildManualProductDailyQty(manualProducts, "CAFÉ", year, month), unitPrice: prices["CAFÉ"] || 30 },
-    { concept: "TORTA GRANDE", dailyQty: buildManualProductDailyQty(manualProducts, "TORTA GRANDE", year, month), unitPrice: prices["TORTA GRANDE"] || 125 },
-    { concept: "TORTA MEDIANA", dailyQty: buildManualProductDailyQty(manualProducts, "TORTA MEDIANA", year, month), unitPrice: prices["TORTA MEDIANA"] || 100 },
-    { concept: "BOCADITOS", dailyQty: buildManualProductDailyQty(manualProducts, "BOCADITOS", year, month), unitPrice: prices["BOCADITOS"] || 2 },
-    { concept: "GASEOSA 3L", dailyQty: buildManualProductDailyQty(manualProducts, "GASEOSA 3L", year, month), unitPrice: prices["GASEOSA 3L"] || 15 },
-    { concept: "GASEOSA 600 ml", dailyQty: buildManualProductDailyQty(manualProducts, "GASEOSA 600 ml", year, month), unitPrice: prices["GASEOSA 600 ml"] || 3.5 },
+    ...buildDynamicManualRows(manualProducts, year, month, [], prices),
   ];
 
   // Sheet 1: CONSOLIDADO APT
@@ -652,9 +621,6 @@ export async function generateExcelProduccion(input: ExcelInput): Promise<Buffer
     cafeDailyQty[dateStr(year, month, d)] = fixedCafe;
   }
 
-  // Auto soda 500ml (Saturdays use actual cenas count)
-  const soda500mlQty = calcSoda500ml(year, month, prodOrders, prodWorkers, cenasDailyQty, adicProd);
-
   // Combined almuerzos: PRODUCCION + STAFF summed per day (consolidado only)
   const combinedAlmuerzosDailyQty: Record<string, number> = {};
   for (let d = 1; d <= days; d++) {
@@ -671,12 +637,7 @@ export async function generateExcelProduccion(input: ExcelInput): Promise<Buffer
     { concept: "CENAS PRODUCCIÓN", dailyQty: cenasDailyQty, unitPrice: prices["CENA"] || 0 },
     ...prodSpecialRows,
     { concept: "CAFÉ", dailyQty: cafeDailyQty, unitPrice: prices["CAFÉ"] || 30 },
-    { concept: "GASEOSAS 500ml", dailyQty: soda500mlQty, unitPrice: prices["GASEOSAS 500ml"] || 3.5 },
-    { concept: "GASEOSA 3L", dailyQty: buildManualProductDailyQty(manualProducts, "GASEOSA 3L", year, month), unitPrice: prices["GASEOSA 3L"] || 15 },
-    { concept: "BOCADITOS", dailyQty: buildManualProductDailyQty(manualProducts, "BOCADITOS", year, month), unitPrice: prices["BOCADITOS"] || 2 },
-    { concept: "TORTA GRANDE", dailyQty: buildManualProductDailyQty(manualProducts, "TORTA GRANDE", year, month), unitPrice: prices["TORTA GRANDE"] || 125 },
-    { concept: "TORTA MEDIANA", dailyQty: buildManualProductDailyQty(manualProducts, "TORTA MEDIANA", year, month), unitPrice: prices["TORTA MEDIANA"] || 100 },
-    { concept: "REPOSICIÓN THERMO", dailyQty: buildManualProductDailyQty(manualProducts, "REPOSICIÓN THERMO", year, month), unitPrice: prices["REPOSICIÓN THERMO"] || 100 },
+    ...buildDynamicManualRows(manualProducts, year, month, ["CENAS PRODUCCIÓN"], prices),
   ];
 
   // Sheet 1: CONSOLIDADO PRODUCCION
@@ -702,7 +663,7 @@ export async function generateExcelPatio(input: ExcelInput): Promise<Buffer> {
   wb.creator = "Sylvia's House";
   wb.created = new Date();
 
-  const { month, year, orders, workers, adicionales, specialOrders, prices } = input;
+  const { month, year, orders, workers, adicionales, manualProducts, specialOrders, prices } = input;
   const days = getDaysInMonth(year, month);
 
   const patioAlmuerzosOrders = orders["PATIO ALMUERZOS"] || [];
@@ -729,6 +690,7 @@ export async function generateExcelPatio(input: ExcelInput): Promise<Buffer> {
     { concept: "ALMUERZOS PATIO", dailyQty: almuerzoDailyTotals, unitPrice: prices["ALMUERZO"] || 0 },
     { concept: "CENAS PATIO", dailyQty: cenaDailyTotals, unitPrice: prices["CENA"] || 0 },
     ...patioSpecialRows,
+    ...buildDynamicManualRows(manualProducts, year, month, [], prices),
   ];
 
   // Sheet 1: CONSOLIDADO PATIO
