@@ -370,6 +370,7 @@ export default function CotizacionGeneradorPage() {
     const { QuotePDFDocument } = await import("@/components/cotizaciones/QuotePDF");
     const brandLogos = await fetchBrandLogos();
     return pdf(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       React.createElement(QuotePDFDocument, {
         quoteNumber: quoteNum, issueDate, currency, company: company!, logoBase64,
         brandLogos,
@@ -377,7 +378,7 @@ export default function CotizacionGeneradorPage() {
         clientAttention, clientPhone, clientEmail, reference,
         paymentTerms, deliveryTime, offerValidity, deliveryPlace,
         items, subtotal, igv, total,
-      })
+      }) as any
     ).toBlob();
   }
 

@@ -203,6 +203,7 @@ export default function HistorialPage() {
       })();
 
       const blob = await pdf(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         React.createElement(QuotePDFDocument, {
           quoteNumber: data.quote_number, issueDate: data.issue_date,
           currency: data.currency, company, logoBase64,
@@ -214,7 +215,7 @@ export default function HistorialPage() {
           deliveryTime: data.delivery_time ?? "", offerValidity: data.offer_validity ?? "",
           deliveryPlace: data.delivery_place ?? "",
           items, subtotal: data.subtotal, igv: data.igv, total: data.total,
-        })
+        }) as any
       ).toBlob();
 
       // Upload to Storage
