@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import {
   Upload, Users, LayoutGrid, BarChart2, Package,
   DollarSign, FileSpreadsheet, ClipboardList, History,
-  ChevronDown, Menu, X, LogOut, User, Building2, Settings, UserCog, RefreshCcw,
+  ChevronDown, Menu, X, LogOut, User, Building2, Settings, UserCog, RefreshCcw, FileText,
 } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 
@@ -31,6 +31,15 @@ const REPORTS_ITEMS = [
   { href: "/reports/errors", label: "Errores" },
   { href: "/reports/compare", label: "Comparador" },
 ];
+
+const QUOTES_DROPDOWN = [
+  { href: "/cotizaciones",               label: "Generar cotización", minRole: "client_admin" },
+  { href: "/cotizaciones/historial",     label: "Historial",          minRole: "client_admin" },
+  { href: "/cotizaciones/clientes",      label: "Clientes",           minRole: "client_admin" },
+  { href: "/cotizaciones/productos",     label: "Productos",          minRole: "client_admin" },
+  { href: "/cotizaciones/marcas",        label: "Marcas",             minRole: "client_admin" },
+  { href: "/cotizaciones/configuracion", label: "Configuración",      minRole: "super_admin"  },
+] as const;
 
 const ADMIN_DROPDOWN = [
   { href: "/products", label: "Productos", icon: Package, minRole: "client_admin" },
@@ -59,6 +68,7 @@ export function Navbar() {
   const pathname = usePathname();
   const { profile, clients, selectedClientId, selectClient, signOut, loading } = useAuth();
   const [reportsOpen, setReportsOpen] = useState(false);
+  const [quotesOpen, setQuotesOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -76,7 +86,7 @@ export function Navbar() {
       .catch(() => {});
   }, [isAdmin, profile]);
 
-  const closeAll = () => { setReportsOpen(false); setAdminOpen(false); setUserOpen(false); };
+  const closeAll = () => { setReportsOpen(false); setQuotesOpen(false); setAdminOpen(false); setUserOpen(false); };
 
   if (loading) return null;
   if (!profile) return null;
@@ -168,7 +178,9 @@ export function Navbar() {
   // ─── ADMIN nav (client_admin / super_admin) ───────────────────────────────
   const visibleNavItems = ADMIN_NAV_ITEMS.filter((i) => !("minRole" in i) || hasAccess(role, i.minRole));
   const visibleAdminItems = ADMIN_DROPDOWN.filter((i) => hasAccess(role, i.minRole));
+  const visibleQuotesItems = QUOTES_DROPDOWN.filter((i) => hasAccess(role, i.minRole));
   const isReportsActive = pathname.startsWith("/reports");
+  const isQuotesActive = pathname.startsWith("/cotizaciones");
   const isAdminActive = [...ADMIN_DROPDOWN, ...SUPER_ADMIN_ITEMS].some((i) => pathname.startsWith(i.href));
 
   return (
@@ -216,9 +228,34 @@ export function Navbar() {
             )}
           </div>
 
+          {/* Cotizaciones dropdown */}
+          {visibleQuotesItems.length > 0 && (
+            <div className="relative">
+              <button onClick={() => { setQuotesOpen(!quotesOpen); setReportsOpen(false); setAdminOpen(false); setUserOpen(false); }}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
+                  isQuotesActive ? "bg-amber-700 text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}>
+                <FileText className="h-4 w-4" />
+                Cotizaciones
+                <ChevronDown className="h-3 w-3" />
+              </button>
+              {quotesOpen && (
+                <div className="absolute top-full left-0 mt-1 w-48 rounded-md border bg-background shadow-lg z-50">
+                  {visibleQuotesItems.map((item) => (
+                    <Link key={item.href} href={item.href} onClick={closeAll}
+                      className="block px-3 py-2 text-sm hover:bg-muted transition-colors">
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Admin dropdown with badge */}
           <div className="relative">
-            <button onClick={() => { setAdminOpen(!adminOpen); setReportsOpen(false); setUserOpen(false); }}
+            <button onClick={() => { setAdminOpen(!adminOpen); setReportsOpen(false); setQuotesOpen(false); setUserOpen(false); }}
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
                 isAdminActive ? "bg-amber-700 text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -333,6 +370,15 @@ export function Navbar() {
                 className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">{item.label}</Link>
             ))}
           </div>
+          {visibleQuotesItems.length > 0 && (
+            <div className="border-t pt-2 mt-2">
+              <p className="text-xs text-muted-foreground px-3 mb-1 font-medium uppercase">Cotizaciones</p>
+              {visibleQuotesItems.map((item) => (
+                <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
+                  className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">{item.label}</Link>
+              ))}
+            </div>
+          )}
           <div className="border-t pt-2 mt-2">
             <p className="text-xs text-muted-foreground px-3 mb-1 font-medium uppercase">
               Admin {pendingCount > 0 && `(${pendingCount})`}
@@ -365,7 +411,7 @@ export function Navbar() {
         </div>
       )}
 
-      {(reportsOpen || adminOpen || userOpen) && <div className="fixed inset-0 z-40" onClick={closeAll} />}
+      {(reportsOpen || quotesOpen || adminOpen || userOpen) && <div className="fixed inset-0 z-40" onClick={closeAll} />}
     </header>
   );
 }
