@@ -49,9 +49,6 @@ export interface ExcelInput {
   manualProducts: ManualProductEntry[];
   // Special-price orders (from email, added manually)
   specialOrders: SpecialOrderSummary[];
-  // Fixed values
-  fixedCenas: number; // default 25 for PRODUCCION
-  fixedCafe: number;  // default 2 for PRODUCCION
   // Prices by concept
   prices: Record<string, number>;
 }
@@ -592,7 +589,7 @@ export async function generateExcelProduccion(input: ExcelInput): Promise<Buffer
   wb.creator = "Sylvia's House";
   wb.created = new Date();
 
-  const { month, year, orders, workers, adicionales, manualProducts, specialOrders, prices, fixedCafe } = input;
+  const { month, year, orders, workers, adicionales, manualProducts, specialOrders, prices } = input;
   const days = getDaysInMonth(year, month);
 
   const prodOrders = orders["PRODUCCION"] || [];
@@ -615,11 +612,8 @@ export async function generateExcelProduccion(input: ExcelInput): Promise<Buffer
   // Cenas from manual products (entered day-by-day via /products)
   const cenasDailyQty = buildManualProductDailyQty(manualProducts, "CENAS PRODUCCIÓN", year, month);
 
-  // Fixed cafe (2 per day by default)
-  const cafeDailyQty: Record<string, number> = {};
-  for (let d = 1; d <= days; d++) {
-    cafeDailyQty[dateStr(year, month, d)] = fixedCafe;
-  }
+  // Café comes exclusively from manual products (loaded via bulk monthly load)
+  const cafeDailyQty = buildManualProductDailyQty(manualProducts, "CAFÉ", year, month);
 
   // Combined almuerzos: PRODUCCION + STAFF summed per day (consolidado only)
   const combinedAlmuerzosDailyQty: Record<string, number> = {};

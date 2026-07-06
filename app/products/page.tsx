@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { Plus, Pencil, Trash2, Save } from "lucide-react";
+import { Plus, Pencil, Trash2, Save, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +96,51 @@ export default function ProductsPage() {
     }
   }
 
+  // Bulk monthly load
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkPT, setBulkPT] = useState("");
+  const [bulkGroup, setBulkGroup] = useState("");
+  const [bulkQty, setBulkQty] = useState(1);
+  const [bulkOnlyOrders, setBulkOnlyOrders] = useState(false);
+  const [bulkConflict, setBulkConflict] = useState<"skip" | "overwrite">("skip");
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ created: number; skipped: number; overwritten: number } | null>(null);
+
+  async function runBulkLoad() {
+    if (!bulkPT || !bulkGroup || bulkQty < 1) {
+      toast.error("Selecciona tipo de producto, grupo y cantidad");
+      return;
+    }
+    setBulkLoading(true);
+    setBulkResult(null);
+    try {
+      const res = await fetch("/api/manual-products/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productTypeId: bulkPT,
+          groupId: bulkGroup,
+          month,
+          year,
+          quantity: bulkQty,
+          onlyWithOrders: bulkOnlyOrders,
+          onConflict: bulkConflict,
+        }),
+      });
+      if (!res.ok) { toast.error((await res.json()).error); return; }
+      const result = await res.json();
+      setBulkResult(result);
+      const parts = [];
+      if (result.created > 0) parts.push(`${result.created} creados`);
+      if (result.overwritten > 0) parts.push(`${result.overwritten} actualizados`);
+      if (result.skipped > 0) parts.push(`${result.skipped} saltados`);
+      toast.success(parts.length ? parts.join(", ") : "Sin cambios");
+      await loadProducts();
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
   // Type management
   const [editType, setEditType] = useState<ProductType | null>(null);
   const [editTypeName, setEditTypeName] = useState("");
@@ -122,8 +167,8 @@ export default function ProductsPage() {
       const grps: Group[] = grpsRes.ok ? await grpsRes.json() : [];
       setProductTypes(pts || []);
       setGroups(grps);
-      if (pts?.length) setFormProductType(pts[0].id);
-      if (grps.length) setFormGroup(grps[0].id);
+      if (pts?.length) { setFormProductType(pts[0].id); setBulkPT(pts[0].id); }
+      if (grps.length) { setFormGroup(grps[0].id); setBulkGroup(grps[0].id); }
       setLoading(false);
     }
     loadBase();
@@ -344,6 +389,111 @@ export default function ProductsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bulk monthly load */}
+      <Card className="mt-8">
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => { setShowBulk(!showBulk); setBulkResult(null); }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base">Carga masiva mensual</CardTitle>
+            </div>
+            {showBulk ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </div>
+          {!showBulk && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Agrega un producto a todos los días del mes de un solo golpe
+            </p>
+          )}
+        </CardHeader>
+        {showBulk && (
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Registra un producto para cada día de{" "}
+              <strong>{MONTHS.find((m) => m.value === month)?.label} {year}</strong>{" "}
+              en el grupo seleccionado.
+            </p>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Tipo de producto</label>
+                <select
+                  value={bulkPT}
+                  onChange={(e) => setBulkPT(e.target.value)}
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {productTypes.map((pt) => (
+                    <option key={pt.id} value={pt.id}>{pt.name} — S/.{pt.unit_price}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Grupo</label>
+                <select
+                  value={bulkGroup}
+                  onChange={(e) => setBulkGroup(e.target.value)}
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Cantidad por día</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={bulkQty}
+                  onChange={(e) => setBulkQty(Number(e.target.value))}
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Si ya existe en ese día</label>
+                <select
+                  value={bulkConflict}
+                  onChange={(e) => setBulkConflict(e.target.value as "skip" | "overwrite")}
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="skip">Saltar (conservar existente)</option>
+                  <option value="overwrite">Sobreescribir cantidad</option>
+                </select>
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer w-fit">
+              <input
+                type="checkbox"
+                checked={bulkOnlyOrders}
+                onChange={(e) => setBulkOnlyOrders(e.target.checked)}
+                className="rounded border-input h-4 w-4 accent-primary"
+              />
+              <span className="text-sm">Solo días que tengan pedidos registrados en ese grupo</span>
+            </label>
+
+            {bulkResult && (
+              <div className="rounded-md border border-border bg-muted/30 px-4 py-3 text-sm flex gap-4 flex-wrap">
+                <span className="text-green-700 font-medium">{bulkResult.created} creados</span>
+                {bulkResult.overwritten > 0 && <span className="text-blue-700 font-medium">{bulkResult.overwritten} actualizados</span>}
+                {bulkResult.skipped > 0 && <span className="text-muted-foreground">{bulkResult.skipped} saltados</span>}
+              </div>
+            )}
+
+            <Button
+              onClick={runBulkLoad}
+              disabled={bulkLoading}
+              className="w-full sm:w-auto bg-amber-700 hover:bg-amber-800 text-white"
+            >
+              <CalendarDays className="h-4 w-4 mr-2" />
+              {bulkLoading ? "Cargando..." : `Cargar a todo ${MONTHS.find((m) => m.value === month)?.label}`}
+            </Button>
+          </CardContent>
+        )}
+      </Card>
 
       {/* Month products table */}
       <Card className="mt-8">

@@ -248,9 +248,9 @@ export default function DashboardPage() {
   }, [groupCards, workdays]);
   const completeGroupsCount = useMemo(() => groupCards.filter((g) => g.isComplete).length, [groupCards]);
 
-  const progressColor = progressPct > 90 ? "bg-green-500" : progressPct >= 50 ? "bg-yellow-400" : "bg-red-500";
-  const progressTextColor = progressPct > 90 ? "text-green-700" : progressPct >= 50 ? "text-yellow-700" : "text-red-700";
-  const progressBg = progressPct > 90 ? "bg-green-50 border-green-200" : progressPct >= 50 ? "bg-yellow-50 border-yellow-200" : "bg-red-50 border-red-200";
+  const progressColor = progressPct > 90 ? "bg-green-500" : progressPct >= 50 ? "bg-amber-500" : "bg-primary";
+  const progressTextColor = progressPct > 90 ? "text-green-700" : progressPct >= 50 ? "text-amber-700" : "text-primary";
+  const progressBg = progressPct > 90 ? "bg-green-50 border-green-200" : progressPct >= 50 ? "bg-amber-50 border-amber-200" : "bg-rose-50 border-rose-200";
 
   const isCurrentMonth = selectedYear === nowRef.getFullYear() && selectedMonth === nowRef.getMonth() + 1;
   const selectedDateObj = new Date(selectedYear, selectedMonth - 1, 1);
@@ -361,14 +361,14 @@ export default function DashboardPage() {
       {/* Header + month selector */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-primary">Dashboard</h1>
           <p className="text-muted-foreground">Visión general del sistema</p>
         </div>
         <div className="flex items-center gap-2">
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="rounded-md border border-input px-3 py-2 text-sm bg-white"
+            className="rounded-md border border-input px-3 py-2 text-sm bg-background"
           >
             {MONTHS_ES.slice(1).map((name, i) => (
               <option key={i + 1} value={i + 1}>{name}</option>
@@ -377,7 +377,7 @@ export default function DashboardPage() {
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="rounded-md border border-input px-3 py-2 text-sm bg-white"
+            className="rounded-md border border-input px-3 py-2 text-sm bg-background"
           >
             {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
@@ -417,8 +417,8 @@ export default function DashboardPage() {
       ) : (
         <>
           <div>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <BarChart2 className="h-5 w-5 text-amber-700" />
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-foreground">
+              <BarChart2 className="h-5 w-5 text-primary" />
               Resumen por grupo
             </h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -427,14 +427,15 @@ export default function DashboardPage() {
                 const pct = workdays > 0 ? Math.min(100, (g.daysLoaded / workdays) * 100) : 0;
                 return (
                   <Link key={g.id} href={`/groups/${g.id}`}>
-                    <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                    <Card className="cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 h-full overflow-hidden border border-border">
+                      <div className="h-1" style={{ backgroundColor: color }} />
                       <CardContent className="pt-4 pb-4">
                         <div className="flex items-start justify-between mb-3 gap-2">
-                          <p className="font-bold text-sm leading-snug">{g.name}</p>
+                          <p className="font-bold text-sm leading-snug text-foreground">{g.name}</p>
                           {g.isComplete ? (
                             <Badge className="bg-green-100 text-green-700 border-0 shrink-0 text-xs">✓ Completo</Badge>
                           ) : (
-                            <Badge className="bg-yellow-100 text-yellow-700 border-0 shrink-0 text-xs">⏳ Pendiente</Badge>
+                            <Badge className="bg-amber-50 text-amber-700 border-0 shrink-0 text-xs">⏳ Pendiente</Badge>
                           )}
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-sm mb-3">
@@ -444,15 +445,15 @@ export default function DashboardPage() {
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground mb-0.5">Días cargados</p>
-                            <p className="font-bold text-2xl">
+                            <p className="font-bold text-2xl text-foreground">
                               {g.daysLoaded}
                               <span className="text-sm font-normal text-muted-foreground">/{workdays}</span>
                             </p>
                           </div>
                         </div>
-                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                           <div
-                            className={`h-full rounded-full ${g.isComplete ? "bg-green-500" : "bg-yellow-400"}`}
+                            className={`h-full rounded-full ${g.isComplete ? "bg-green-500" : "bg-amber-500"}`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>
@@ -473,7 +474,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <BarChart2 className="h-4 w-4 text-amber-700" />
+                <BarChart2 className="h-4 w-4 text-primary" />
                 Pedidos por día — {MONTHS_ES[selectedMonth]} {selectedYear}
               </CardTitle>
               {missingWorkdays.length > 0 && (
@@ -509,7 +510,7 @@ export default function DashboardPage() {
             <CardHeader className="pb-2">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-amber-700" />
+                  <TrendingUp className="h-4 w-4 text-primary" />
                   Comparativo mensual
                 </CardTitle>
                 <div className="text-xs space-y-0.5 text-right">

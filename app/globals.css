@@ -46,41 +46,55 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* ── Brand palette: remap amber-700/800 to coral so all bg-amber-700 usage
+        becomes the brand terracotta automatically ─────────────────────────── */
+  --color-amber-50:  oklch(0.986 0.012 85);   /* warm cream tint */
+  --color-amber-700: oklch(0.497 0.196 34);   /* #C1440E coral/terracotta  */
+  --color-amber-800: oklch(0.425 0.173 33);   /* darker coral for hover    */
+  --color-amber-900: oklch(0.358 0.145 33);   /* deepest coral             */
+
+  /* Convenience brand tokens (bg-brand-gold, text-brand-gold, etc.) */
+  --color-brand-gold:   oklch(0.728 0.128 63);  /* #E8A33D golden/mustard  */
+  --color-brand-coral:  oklch(0.497 0.196 34);  /* #C1440E terracotta      */
+  --color-brand-cream:  oklch(0.984 0.009 82);  /* #FDF8F3 cream bg        */
+  --color-brand-brown:  oklch(0.237 0.046 43);  /* #3D2817 dark warm text  */
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  /* ── Warm brand palette ─────────────────────────────────────────────────── */
+  --background: oklch(0.984 0.009 82);         /* #FDF8F3 warm cream          */
+  --foreground: oklch(0.237 0.046 43);         /* #3D2817 dark warm brown     */
+  --card: oklch(1 0 0);                        /* white cards for contrast    */
+  --card-foreground: oklch(0.237 0.046 43);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.237 0.046 43);
+  --primary: oklch(0.497 0.196 34);            /* #C1440E coral / terracotta  */
+  --primary-foreground: oklch(0.99 0 0);       /* white                       */
+  --secondary: oklch(0.963 0.016 79);          /* warm light cream            */
+  --secondary-foreground: oklch(0.32 0.047 45);
+  --muted: oklch(0.963 0.016 79);              /* warm muted bg               */
+  --muted-foreground: oklch(0.497 0.033 51);   /* warm gray-brown             */
+  --accent: oklch(0.728 0.128 63);             /* #E8A33D golden/mustard      */
+  --accent-foreground: oklch(0.237 0.046 43);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --border: oklch(0.915 0.019 78);             /* #EFE6DA warm beige border   */
+  --input: oklch(0.915 0.019 78);
+  --ring: oklch(0.497 0.196 34);               /* coral focus ring            */
+  --chart-1: oklch(0.497 0.196 34);            /* coral                       */
+  --chart-2: oklch(0.728 0.128 63);            /* golden                      */
+  --chart-3: oklch(0.65 0.14 145);             /* green                       */
+  --chart-4: oklch(0.58 0.15 230);             /* blue                        */
+  --chart-5: oklch(0.52 0.16 290);             /* purple                      */
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.963 0.016 79);
+  --sidebar-foreground: oklch(0.237 0.046 43);
+  --sidebar-primary: oklch(0.497 0.196 34);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.935 0.020 78);
+  --sidebar-accent-foreground: oklch(0.237 0.046 43);
+  --sidebar-border: oklch(0.915 0.019 78);
+  --sidebar-ring: oklch(0.497 0.196 34);
 }
 
 .dark {

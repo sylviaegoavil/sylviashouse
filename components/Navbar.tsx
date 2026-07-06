@@ -94,10 +94,10 @@ export function Navbar() {
   // ─── READONLY nav ─────────────────────────────────────────────────────────
   if (role === "readonly") {
     return (
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 border-b-2 border-primary bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex h-14 max-w-7xl items-center px-4">
           <Link href="/dashboard" className="flex items-center gap-2 mr-6 shrink-0">
-            <span className="text-base font-bold tracking-tight">Sylvia&apos;s House</span>
+            <span className="text-base font-bold tracking-tight text-primary">Sylvia&apos;s House</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
@@ -129,7 +129,7 @@ export function Navbar() {
                 <ChevronDown className="h-3 w-3" />
               </button>
               {userOpen && (
-                <div className="absolute top-full right-0 mt-1 w-48 rounded-md border bg-background shadow-lg z-50">
+                <div className="absolute top-full right-0 mt-1 w-48 rounded-md border border-border bg-card shadow-md z-50">
                   <div className="px-3 py-2 border-b">
                     <p className="text-xs font-medium truncate">{profile.full_name}</p>
                     <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
@@ -184,10 +184,10 @@ export function Navbar() {
   const isAdminActive = [...ADMIN_DROPDOWN, ...SUPER_ADMIN_ITEMS].some((i) => pathname.startsWith(i.href));
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 border-b-2 border-primary bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-7xl items-center px-4">
         <Link href="/dashboard" className="flex items-center gap-2 mr-6 shrink-0">
-          <span className="text-base font-bold tracking-tight">Sylvia&apos;s House</span>
+          <span className="text-base font-bold tracking-tight text-primary">Sylvia&apos;s House</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
@@ -217,7 +217,7 @@ export function Navbar() {
               <ChevronDown className="h-3 w-3" />
             </button>
             {reportsOpen && (
-              <div className="absolute top-full left-0 mt-1 w-44 rounded-md border bg-background shadow-lg z-50">
+              <div className="absolute top-full left-0 mt-1 w-44 rounded-md border border-border bg-card shadow-md z-50">
                 {REPORTS_ITEMS.map((item) => (
                   <Link key={item.href} href={item.href} onClick={closeAll}
                     className="block px-3 py-2 text-sm hover:bg-muted transition-colors">
@@ -241,7 +241,7 @@ export function Navbar() {
                 <ChevronDown className="h-3 w-3" />
               </button>
               {quotesOpen && (
-                <div className="absolute top-full left-0 mt-1 w-48 rounded-md border bg-background shadow-lg z-50">
+                <div className="absolute top-full left-0 mt-1 w-48 rounded-md border border-border bg-card shadow-md z-50">
                   {visibleQuotesItems.map((item) => (
                     <Link key={item.href} href={item.href} onClick={closeAll}
                       className="block px-3 py-2 text-sm hover:bg-muted transition-colors">
@@ -270,7 +270,7 @@ export function Navbar() {
               <ChevronDown className="h-3 w-3" />
             </button>
             {adminOpen && (
-              <div className="absolute top-full left-0 mt-1 w-52 rounded-md border bg-background shadow-lg z-50">
+              <div className="absolute top-full left-0 mt-1 w-52 rounded-md border border-border bg-card shadow-md z-50">
                 {visibleAdminItems.map((item) => (
                   <Link key={item.href} href={item.href} onClick={closeAll}
                     className="flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
@@ -317,7 +317,7 @@ export function Navbar() {
               <ChevronDown className="h-3 w-3" />
             </button>
             {userOpen && (
-              <div className="absolute top-full right-0 mt-1 w-48 rounded-md border bg-background shadow-lg z-50">
+              <div className="absolute top-full right-0 mt-1 w-48 rounded-md border border-border bg-card shadow-md z-50">
                 <div className="px-3 py-2 border-b">
                   <p className="text-xs font-medium truncate">{profile.full_name}</p>
                   <p className="text-xs text-muted-foreground truncate">{profile.email}</p>

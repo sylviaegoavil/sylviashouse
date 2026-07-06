@@ -123,20 +123,6 @@ export async function POST(request: NextRequest) {
       .lte("effective_from", startDate)
       .order("effective_from", { ascending: false });
 
-    // Fetch fixed values for PRODUCCION
-    const { data: fixedValuesRaw } = await supabase
-      .from("group_fixed_values")
-      .select("group_id, concept, default_quantity")
-      .in("group_id", groupIds);
-
-    // Fetch fixed value overrides for this month
-    const { data: overridesRaw } = await supabase
-      .from("fixed_value_overrides")
-      .select("group_id, concept, override_date, quantity")
-      .in("group_id", groupIds)
-      .gte("override_date", startDate)
-      .lte("override_date", endDate);
-
     // Build data structures
     const workersByGroup: Record<string, { id: string; full_name: string; doc_number: string }[]> = {};
     for (const w of allWorkers || []) {
@@ -245,16 +231,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fixed values for PRODUCCION
-    let fixedCenas = 25;
-    let fixedCafe = 2;
-    if (fixedValuesRaw) {
-      for (const fv of fixedValuesRaw) {
-        if (fv.concept === "CENAS") fixedCenas = fv.default_quantity;
-        if (fv.concept === "CAFÉ") fixedCafe = fv.default_quantity;
-      }
-    }
-
     const input: ExcelInput = {
       month: monthNum,
       year,
@@ -263,8 +239,6 @@ export async function POST(request: NextRequest) {
       adicionales: adicionalesByGroup,
       manualProducts,
       specialOrders,
-      fixedCenas,
-      fixedCafe,
       prices,
     };
 
