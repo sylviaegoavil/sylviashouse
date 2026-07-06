@@ -14,7 +14,6 @@ export interface QuoteItem {
   id: string;
   position: number;
   quantity: number;
-  unit: string;
   productType: string;
   brandName: string;
   description: string;
@@ -79,11 +78,10 @@ const BORDER     = "#d1d5db";
 const GRAY_BG    = "#f9fafb";
 
 // ── Column widths (portrait A4, usable ≈ 535pt) ───────────────────────────
-// Fixed cols: 20+46+28+72+72 = 238  →  description flex fills ~297pt
+// Fixed cols: 20+46+72+72 = 210  →  description flex fills ~325pt
 const COL = {
   it:  20,
   qty: 46,
-  um:  28,
   vvu: 72,
   vv:  72,
 } as const;
@@ -264,19 +262,22 @@ function formatDate(d: string) {
   return `${day}/${m}/${y}`;
 }
 
-// ── Table header row — extracted so it can be rendered twice (fixed repeat) ─
+// ── Table header row ──────────────────────────────────────────────────────
 function TableHeader() {
   return (
-    <View style={s.thRow} fixed>
+    <View style={s.thRow}>
       <Text style={[s.th, { width: COL.it }]}>It</Text>
       <Text style={[s.th, { width: COL.qty }]}>Cant.</Text>
-      <Text style={[s.th, { width: COL.um }]}>U/M</Text>
       <Text style={[s.th, { flex: 1 }]}>Descripción</Text>
       <Text style={[s.th, { width: COL.vvu }]}>V.V. Unitario</Text>
       <Text style={[s.thLast, { width: COL.vv }]}>V. Venta</Text>
     </View>
   );
 }
+
+// Items fit per page (conservative — accounts for 2-line descriptions)
+const FIRST_PAGE_ITEMS = 20;
+const ITEMS_PER_PAGE   = 28;
 
 // ── Main component ─────────────────────────────────────────────────────────
 export function QuotePDFDocument(props: QuotePDFProps) {
@@ -371,34 +372,48 @@ export function QuotePDFDocument(props: QuotePDFProps) {
         </Text>
 
         {/* ── PRODUCTS TABLE ───────────────────────────────────────────── */}
-        <View style={s.productsTable}>
-          <TableHeader />
-          {items.map((item, i) => {
-            const isLast = i === items.length - 1;
+        {/* Split into groups so each page gets its own header row via `break` */}
+        {(() => {
+          const groups: QuoteItem[][] = [];
+          if (items.length <= FIRST_PAGE_ITEMS) {
+            groups.push(items);
+          } else {
+            groups.push(items.slice(0, FIRST_PAGE_ITEMS));
+            let off = FIRST_PAGE_ITEMS;
+            while (off < items.length) {
+              groups.push(items.slice(off, off + ITEMS_PER_PAGE));
+              off += ITEMS_PER_PAGE;
+            }
+          }
+          return groups.map((groupItems, gIdx) => {
+            const isLastGroup = gIdx === groups.length - 1;
             return (
-              <View
-                key={item.id}
-                style={isLast ? s.tdRowLast : s.tdRow}
-                wrap={false}
-              >
-                <Text style={[s.td, { width: COL.it, textAlign: "center" }]}>
-                  {item.position}
-                </Text>
-                <Text style={[s.td, { width: COL.qty, textAlign: "right" }]}>
-                  {fmtQty(item.quantity)}
-                </Text>
-                <Text style={[s.td, { width: COL.um }]}>{item.unit}</Text>
-                <Text style={[s.td, { flex: 1 }]}>{item.description}</Text>
-                <Text style={[s.td, { width: COL.vvu, textAlign: "right" }]}>
-                  {fmt(item.unitPrice, sym)}
-                </Text>
-                <Text style={[s.tdLast, { width: COL.vv, textAlign: "right" }]}>
-                  {fmt(item.lineTotal, sym)}
-                </Text>
+              <View key={gIdx} style={s.productsTable} break={gIdx > 0}>
+                <TableHeader />
+                {groupItems.map((item, i) => {
+                  const isLast = isLastGroup && i === groupItems.length - 1;
+                  return (
+                    <View key={item.id} style={isLast ? s.tdRowLast : s.tdRow} wrap={false}>
+                      <Text style={[s.td, { width: COL.it, textAlign: "center" }]}>
+                        {item.position}
+                      </Text>
+                      <Text style={[s.td, { width: COL.qty, textAlign: "right" }]}>
+                        {fmtQty(item.quantity)}
+                      </Text>
+                      <Text style={[s.td, { flex: 1 }]}>{item.description}</Text>
+                      <Text style={[s.td, { width: COL.vvu, textAlign: "right" }]}>
+                        {fmt(item.unitPrice, sym)}
+                      </Text>
+                      <Text style={[s.tdLast, { width: COL.vv, textAlign: "right" }]}>
+                        {fmt(item.lineTotal, sym)}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             );
-          })}
-        </View>
+          });
+        })()}
 
         {/* ── CONDITIONS + TOTALS ───────────────────────────────────────── */}
         <View style={s.bottom} wrap={false}>

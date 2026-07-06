@@ -15,7 +15,6 @@ interface QuoteItem {
   id: string;
   position: number;
   quantity: number;
-  unit: string;
   productType: string;
   brandName: string;
   description: string;
@@ -27,7 +26,6 @@ interface CatalogProduct {
   id: string;
   code: string | null;
   description: string;
-  unit: string | null;
   product_type: string | null;
   unit_price: number | null;
   brands: { name: string } | null;
@@ -196,7 +194,6 @@ export default function CotizacionGeneradorPage() {
       id: crypto.randomUUID(),
       position: prev.length + 1,
       quantity: 1,
-      unit: p.unit ?? "",
       productType: p.product_type ?? "",
       brandName: p.brands?.name ?? "",
       description: p.description,
@@ -212,7 +209,6 @@ export default function CotizacionGeneradorPage() {
       id: crypto.randomUUID(),
       position: prev.length + 1,
       quantity: 1,
-      unit: "",
       productType: "",
       brandName: "",
       description: "",
@@ -704,7 +700,6 @@ export default function CotizacionGeneradorPage() {
                       <tr className="border-b">
                         <th className="text-left py-1.5 font-medium w-7">#</th>
                         <th className="text-left py-1.5 font-medium w-16">Cant.</th>
-                        <th className="text-left py-1.5 font-medium w-14">U/M</th>
                         <th className="text-left py-1.5 font-medium">Descripción</th>
                         <th className="text-right py-1.5 font-medium w-24">V.V.Unit.</th>
                         <th className="text-right py-1.5 font-medium w-24">V.Venta</th>
@@ -721,13 +716,6 @@ export default function CotizacionGeneradorPage() {
                               value={item.quantity}
                               onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
                               className="w-full rounded border border-input px-1.5 py-1 text-xs text-right"
-                            />
-                          </td>
-                          <td className="py-1 pr-1">
-                            <input
-                              value={item.unit}
-                              onChange={(e) => updateItem(item.id, "unit", e.target.value)}
-                              className="w-full rounded border border-input px-1.5 py-1 text-xs"
                             />
                           </td>
                           <td className="py-1 pr-1">
@@ -962,7 +950,6 @@ function QuotePreview(p: PreviewProps) {
             <tr>
               <th className="border border-gray-200 px-2 py-1 text-center w-6">It</th>
               <th className="border border-gray-200 px-2 py-1 text-right w-12">Cant.</th>
-              <th className="border border-gray-200 px-2 py-1 w-10">U/M</th>
               <th className="border border-gray-200 px-2 py-1 text-left">Descripción</th>
               <th className="border border-gray-200 px-2 py-1 w-14">Tipo</th>
               <th className="border border-gray-200 px-2 py-1 w-14">Marca</th>
@@ -975,7 +962,6 @@ function QuotePreview(p: PreviewProps) {
               <tr key={item.id} className="border-b border-gray-100">
                 <td className="px-2 py-1 text-center">{item.position}</td>
                 <td className="px-2 py-1 text-right">{item.quantity.toFixed(2)}</td>
-                <td className="px-2 py-1">{item.unit}</td>
                 <td className="px-2 py-1 font-medium">{item.description}</td>
                 <td className="px-2 py-1 text-gray-500">{item.productType}</td>
                 <td className="px-2 py-1 text-gray-500">{item.brandName}</td>

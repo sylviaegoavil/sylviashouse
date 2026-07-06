@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/Navbar";
@@ -16,6 +16,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#8B4513",
+};
+
 export const metadata: Metadata = {
   title: "Sylvia's House - Sistema de Pedidos",
   description: "Sistema de gestion de pedidos de comida por WhatsApp",
@@ -25,7 +29,6 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Sylvia's House",
   },
-  themeColor: "#8B4513",
 };
 
 export default function RootLayout({

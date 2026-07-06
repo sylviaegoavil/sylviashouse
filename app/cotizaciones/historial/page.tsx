@@ -486,7 +486,6 @@ export default function HistorialPage() {
                           <th className="text-left py-1.5 font-medium">Tipo</th>
                           <th className="text-left py-1.5 font-medium">Marca</th>
                           <th className="text-right py-1.5 font-medium">Cant.</th>
-                          <th className="text-left py-1.5 font-medium">U/M</th>
                           <th className="text-right py-1.5 font-medium">P. Unit.</th>
                           <th className="text-right py-1.5 font-medium">Total</th>
                         </tr>
@@ -501,7 +500,6 @@ export default function HistorialPage() {
                               <td className="py-1.5 text-muted-foreground">{item.product_type ?? "—"}</td>
                               <td className="py-1.5 text-muted-foreground">{item.brand_name ?? "—"}</td>
                               <td className="py-1.5 text-right">{item.quantity}</td>
-                              <td className="py-1.5">{item.unit ?? ""}</td>
                               <td className="py-1.5 text-right">{sym} {item.unit_price.toFixed(2)}</td>
                               <td className="py-1.5 text-right font-medium">{sym} {item.line_total.toFixed(2)}</td>
                             </tr>

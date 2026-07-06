@@ -12,14 +12,13 @@ interface Product {
   id: string;
   code: string | null;
   description: string;
-  unit: string | null;
   unit_price: number | null;
   currency: string;
   is_active: boolean;
 }
 
 const EMPTY_FORM = {
-  description: "", unit: "", unit_price: "", currency: "PEN",
+  description: "", unit_price: "", currency: "PEN",
 };
 
 // Auto-generate next code from existing products
@@ -52,7 +51,7 @@ export default function ProductosCotizacionesPage() {
 
   // Inline edit
   const [editId, setEditId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ ...EMPTY_FORM, code: "" });
+  const [editForm, setEditForm] = useState({ description: "", unit_price: "", currency: "PEN", code: "" });
   const [editSaving, setEditSaving] = useState(false);
 
   // Delete confirm
@@ -105,7 +104,6 @@ export default function ProductosCotizacionesPage() {
     setEditForm({
       code: p.code ?? "",
       description: p.description,
-      unit: p.unit ?? "",
       unit_price: p.unit_price != null ? String(p.unit_price) : "",
       currency: p.currency,
     });
@@ -121,7 +119,6 @@ export default function ProductosCotizacionesPage() {
         body: JSON.stringify({
           code: generatedCode,
           description: form.description.trim(),
-          unit: form.unit || null,
           unit_price: form.unit_price ? parseFloat(form.unit_price) : null,
           currency: form.currency,
         }),
@@ -146,7 +143,6 @@ export default function ProductosCotizacionesPage() {
         body: JSON.stringify({
           id: editId,
           description: editForm.description.trim(),
-          unit: editForm.unit || null,
           unit_price: editForm.unit_price ? parseFloat(editForm.unit_price) : null,
           currency: editForm.currency,
         }),
@@ -213,17 +209,15 @@ export default function ProductosCotizacionesPage() {
       const ws = wb.worksheets[0];
       if (!ws) { toast.error("No se encontró hoja en el archivo"); return; }
 
-      const rawRows: { description: string; unit: string | null; unit_price: number | null; currency: string }[] = [];
+      const rawRows: { description: string; unit_price: number | null; currency: string }[] = [];
       ws.eachRow((row, ri) => {
         if (ri === 1) return;
         const description = String(row.getCell(1).value ?? "").trim();
-        const unit = String(row.getCell(2).value ?? "").trim();
-        const priceVal = row.getCell(3).value;
-        const currency = String(row.getCell(4).value ?? "PEN").trim() || "PEN";
+        const priceVal = row.getCell(2).value;
+        const currency = String(row.getCell(3).value ?? "PEN").trim() || "PEN";
         if (!description) return;
         rawRows.push({
           description,
-          unit: unit || null,
           unit_price: priceVal != null && priceVal !== "" ? parseFloat(String(priceVal)) : null,
           currency,
         });
@@ -262,9 +256,9 @@ export default function ProductosCotizacionesPage() {
     const ExcelJS = (await import("exceljs")).default;
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Productos");
-    ws.addRow(["Descripción", "U/M", "Precio", "Moneda"]);
+    ws.addRow(["Descripción", "Precio", "Moneda"]);
     ws.getRow(1).font = { bold: true };
-    ws.columns = [{ width: 40 }, { width: 10 }, { width: 12 }, { width: 10 }];
+    ws.columns = [{ width: 40 }, { width: 12 }, { width: 10 }];
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
@@ -323,13 +317,7 @@ export default function ProductosCotizacionesPage() {
                 placeholder="TORTA GRANDE 30 PORCIONES" autoFocus
                 className="rounded border border-input px-2 py-1.5 text-sm" />
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium">U/M</label>
-                <input value={form.unit} onChange={(e) => setField("unit", e.target.value)}
-                  placeholder="UND"
-                  className="rounded border border-input px-2 py-1.5 text-sm" />
-              </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium">Precio</label>
                 <input type="number" min="0" step="0.01" value={form.unit_price}
