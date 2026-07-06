@@ -1,13 +1,46 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Upload, Users, LayoutGrid } from "lucide-react";
+import { createServiceRoleSupabaseClient } from "@/lib/supabase-server";
 
-export default function HomePage() {
+async function getLogoUrl(): Promise<string | null> {
+  try {
+    const supabase = createServiceRoleSupabaseClient();
+    const { data } = await supabase
+      .from("company_settings")
+      .select("logo_url")
+      .limit(1)
+      .single();
+    return data?.logo_url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function HomePage() {
+  const logoUrl = await getLogoUrl();
+
   return (
     <div className="min-h-[calc(100vh-56px)] bg-gradient-to-b from-brand-cream to-white">
       <div className="mx-auto max-w-4xl px-4 py-16">
 
         {/* Hero */}
         <div className="text-center mb-14">
+          {logoUrl && (
+            <div className="flex justify-center mb-6">
+              <div className="relative h-52 w-auto">
+                <Image
+                  src={logoUrl}
+                  alt="Sylvia's House"
+                  height={208}
+                  width={208}
+                  className="h-52 w-auto object-contain drop-shadow-md"
+                  priority
+                  unoptimized
+                />
+              </div>
+            </div>
+          )}
           <h1 className="text-5xl font-bold tracking-tight mb-4 text-primary">
             Sylvia&apos;s House
           </h1>

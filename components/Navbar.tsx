@@ -17,7 +17,7 @@ function hasAccess(userRole: Role, minRole: string): boolean {
   return ROLE_RANK[userRole] >= ROLE_RANK[minRole as Role];
 }
 
-// ─── Admin nav (client_admin + super_admin) ───────────────────────────────────
+// ─── Nav item lists ───────────────────────────────────────────────────────────
 
 const ADMIN_NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart2 },
@@ -55,14 +55,23 @@ const SUPER_ADMIN_ITEMS = [
   { href: "/admin/users", label: "Usuarios", icon: Users },
 ];
 
-// ─── Readonly nav (client) ────────────────────────────────────────────────────
-
 const READONLY_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart2 },
   { href: "/groups", label: "Pedidos", icon: LayoutGrid },
   { href: "/reports", label: "Reportes", icon: FileSpreadsheet },
   { href: "/personal", label: "Personal", icon: UserCog },
 ];
+
+// ─── Shared class tokens ──────────────────────────────────────────────────────
+
+// Inactive nav item on dark navbar
+const navItem = "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors text-white/75 hover:bg-white/10 hover:text-white";
+// Active nav item: golden pill, dark text
+const navItemActive = "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-semibold transition-colors bg-brand-gold text-brand-brown";
+// Dropdown panel
+const dropdownPanel = "absolute top-full left-0 mt-1.5 rounded-lg border border-border bg-card shadow-lg z-50 overflow-hidden";
+// Dropdown item
+const dropdownItem = "flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-amber-50 transition-colors";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -77,7 +86,6 @@ export function Navbar() {
   const role = (profile?.role ?? "readonly") as Role;
   const isAdmin = role === "super_admin" || role === "client_admin";
 
-  // Load pending request count for admins
   useEffect(() => {
     if (!isAdmin || !profile) return;
     fetch("/api/worker-requests?count=true")
@@ -94,21 +102,18 @@ export function Navbar() {
   // ─── READONLY nav ─────────────────────────────────────────────────────────
   if (role === "readonly") {
     return (
-      <header className="sticky top-0 z-50 border-b-2 border-primary bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 bg-navbar-bg shadow-md">
         <div className="mx-auto flex h-14 max-w-7xl items-center px-4">
-          <Link href="/dashboard" className="flex items-center gap-2 mr-6 shrink-0">
-            <span className="text-base font-bold tracking-tight text-primary">Sylvia&apos;s House</span>
+          <Link href="/" className="flex items-center gap-2 mr-6 shrink-0">
+            <span className="text-base font-bold tracking-tight text-brand-gold">Sylvia&apos;s House</span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-0.5">
             {READONLY_NAV.map((item) => {
               const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
               return (
                 <Link key={item.href} href={item.href}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                    isActive ? "bg-amber-700 text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}>
+                  className={isActive ? navItemActive : navItem}>
                   <item.icon className="h-4 w-4" />
                   {item.label}
                 </Link>
@@ -117,29 +122,29 @@ export function Navbar() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            <button className="md:hidden rounded-md p-2 text-muted-foreground hover:bg-muted"
+            <button className="md:hidden rounded-md p-2 text-white/70 hover:bg-white/10"
               onClick={() => setMobileOpen(!mobileOpen)}>
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
             <div className="relative hidden md:block">
               <button onClick={() => setUserOpen(!userOpen)}
-                className="flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors">
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-white/75 hover:bg-white/10 hover:text-white transition-colors">
                 <User className="h-4 w-4" />
                 <span className="max-w-[120px] truncate">{profile.full_name}</span>
                 <ChevronDown className="h-3 w-3" />
               </button>
               {userOpen && (
-                <div className="absolute top-full right-0 mt-1 w-48 rounded-md border border-border bg-card shadow-md z-50">
-                  <div className="px-3 py-2 border-b">
-                    <p className="text-xs font-medium truncate">{profile.full_name}</p>
+                <div className="absolute top-full right-0 mt-1.5 w-48 rounded-lg border border-border bg-card shadow-lg z-50 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-border bg-amber-50/50">
+                    <p className="text-xs font-semibold truncate text-foreground">{profile.full_name}</p>
                     <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
                   </div>
                   <Link href="/profile" onClick={closeAll}
-                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
-                    <User className="h-3.5 w-3.5" /> Mi perfil
+                    className={dropdownItem}>
+                    <User className="h-3.5 w-3.5 text-muted-foreground" /> Mi perfil
                   </Link>
                   <button onClick={() => { closeAll(); signOut(); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors text-destructive">
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-rose-50 transition-colors">
                     <LogOut className="h-3.5 w-3.5" /> Cerrar sesión
                   </button>
                 </div>
@@ -149,22 +154,22 @@ export function Navbar() {
         </div>
 
         {mobileOpen && (
-          <div className="md:hidden border-t bg-background px-4 py-3 space-y-1">
+          <div className="md:hidden border-t border-white/10 bg-navbar-bg px-4 py-3 space-y-0.5">
             {READONLY_NAV.map((item) => (
               <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
                 className={cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium",
-                  pathname === item.href ? "bg-amber-700 text-white" : "text-muted-foreground hover:bg-muted")}>
+                  pathname === item.href ? "bg-brand-gold text-brand-brown font-semibold" : "text-white/75 hover:bg-white/10 hover:text-white")}>
                 <item.icon className="h-4 w-4" />
                 {item.label}
               </Link>
             ))}
-            <div className="border-t pt-2 mt-2">
+            <div className="border-t border-white/10 pt-2 mt-2">
               <Link href="/profile" onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white">
                 <User className="h-4 w-4" /> Mi perfil
               </Link>
               <button onClick={() => { setMobileOpen(false); signOut(); }}
-                className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-muted">
+                className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-rose-300 hover:bg-white/10">
                 <LogOut className="h-4 w-4" /> Cerrar sesión
               </button>
             </div>
@@ -184,21 +189,18 @@ export function Navbar() {
   const isAdminActive = [...ADMIN_DROPDOWN, ...SUPER_ADMIN_ITEMS].some((i) => pathname.startsWith(i.href));
 
   return (
-    <header className="sticky top-0 z-50 border-b-2 border-primary bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 bg-navbar-bg shadow-md">
       <div className="mx-auto flex h-14 max-w-7xl items-center px-4">
-        <Link href="/dashboard" className="flex items-center gap-2 mr-6 shrink-0">
-          <span className="text-base font-bold tracking-tight text-primary">Sylvia&apos;s House</span>
+        <Link href="/" className="flex items-center gap-2 mr-6 shrink-0">
+          <span className="text-base font-bold tracking-tight text-brand-gold">Sylvia&apos;s House</span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden md:flex items-center gap-0.5">
           {visibleNavItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
             return (
               <Link key={item.href} href={item.href}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                  isActive ? "bg-amber-700 text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}>
+                className={isActive ? navItemActive : navItem}>
                 <item.icon className="h-4 w-4" />
                 {item.label}
               </Link>
@@ -207,20 +209,17 @@ export function Navbar() {
 
           {/* Reports dropdown */}
           <div className="relative">
-            <button onClick={() => { setReportsOpen(!reportsOpen); setAdminOpen(false); setUserOpen(false); }}
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                isReportsActive ? "bg-amber-700 text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}>
+            <button onClick={() => { setReportsOpen(!reportsOpen); setAdminOpen(false); setQuotesOpen(false); setUserOpen(false); }}
+              className={isReportsActive ? navItemActive : navItem}>
               <FileSpreadsheet className="h-4 w-4" />
               Reportes
               <ChevronDown className="h-3 w-3" />
             </button>
             {reportsOpen && (
-              <div className="absolute top-full left-0 mt-1 w-44 rounded-md border border-border bg-card shadow-md z-50">
+              <div className={cn(dropdownPanel, "w-44")}>
                 {REPORTS_ITEMS.map((item) => (
                   <Link key={item.href} href={item.href} onClick={closeAll}
-                    className="block px-3 py-2 text-sm hover:bg-muted transition-colors">
+                    className={dropdownItem}>
                     {item.label}
                   </Link>
                 ))}
@@ -232,19 +231,16 @@ export function Navbar() {
           {visibleQuotesItems.length > 0 && (
             <div className="relative">
               <button onClick={() => { setQuotesOpen(!quotesOpen); setReportsOpen(false); setAdminOpen(false); setUserOpen(false); }}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                  isQuotesActive ? "bg-amber-700 text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}>
+                className={isQuotesActive ? navItemActive : navItem}>
                 <FileText className="h-4 w-4" />
                 Cotizaciones
                 <ChevronDown className="h-3 w-3" />
               </button>
               {quotesOpen && (
-                <div className="absolute top-full left-0 mt-1 w-48 rounded-md border border-border bg-card shadow-md z-50">
+                <div className={cn(dropdownPanel, "w-48")}>
                   {visibleQuotesItems.map((item) => (
                     <Link key={item.href} href={item.href} onClick={closeAll}
-                      className="block px-3 py-2 text-sm hover:bg-muted transition-colors">
+                      className={dropdownItem}>
                       {item.label}
                     </Link>
                   ))}
@@ -253,13 +249,10 @@ export function Navbar() {
             </div>
           )}
 
-          {/* Admin dropdown with badge */}
+          {/* Admin dropdown */}
           <div className="relative">
             <button onClick={() => { setAdminOpen(!adminOpen); setReportsOpen(false); setQuotesOpen(false); setUserOpen(false); }}
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                isAdminActive ? "bg-amber-700 text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}>
+              className={isAdminActive ? navItemActive : navItem}>
               <Settings className="h-4 w-4" />
               Admin
               {pendingCount > 0 && (
@@ -270,10 +263,10 @@ export function Navbar() {
               <ChevronDown className="h-3 w-3" />
             </button>
             {adminOpen && (
-              <div className="absolute top-full left-0 mt-1 w-52 rounded-md border border-border bg-card shadow-md z-50">
+              <div className={cn(dropdownPanel, "w-52")}>
                 {visibleAdminItems.map((item) => (
                   <Link key={item.href} href={item.href} onClick={closeAll}
-                    className="flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
+                    className={cn(dropdownItem, "justify-between")}>
                     <span className="flex items-center gap-2">
                       <item.icon className="h-3.5 w-3.5 text-muted-foreground" />
                       {item.label}
@@ -285,10 +278,12 @@ export function Navbar() {
                     )}
                   </Link>
                 ))}
-                {role === "super_admin" && visibleAdminItems.length > 0 && <div className="border-t my-1" />}
+                {role === "super_admin" && visibleAdminItems.length > 0 && (
+                  <div className="border-t border-border my-1" />
+                )}
                 {role === "super_admin" && SUPER_ADMIN_ITEMS.map((item) => (
                   <Link key={item.href} href={item.href} onClick={closeAll}
-                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
+                    className={dropdownItem}>
                     <item.icon className="h-3.5 w-3.5 text-muted-foreground" />
                     {item.label}
                   </Link>
@@ -301,40 +296,40 @@ export function Navbar() {
         <div className="ml-auto flex items-center gap-2">
           {role === "super_admin" && clients.length > 1 && (
             <select value={selectedClientId ?? ""} onChange={(e) => selectClient(e.target.value)}
-              className="hidden md:block rounded border border-input px-2 py-1 text-xs bg-background max-w-[140px]">
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              className="hidden md:block rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white max-w-[140px] focus:outline-none focus:border-brand-gold">
+              {clients.map((c) => <option key={c.id} value={c.id} className="bg-card text-foreground">{c.name}</option>)}
             </select>
           )}
-          <button className="md:hidden rounded-md p-2 text-muted-foreground hover:bg-muted"
+          <button className="md:hidden rounded-md p-2 text-white/70 hover:bg-white/10"
             onClick={() => setMobileOpen(!mobileOpen)}>
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <div className="relative hidden md:block">
             <button onClick={() => { setUserOpen(!userOpen); closeAll(); setUserOpen((v) => !v); }}
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors">
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-white/75 hover:bg-white/10 hover:text-white transition-colors">
               <User className="h-4 w-4" />
               <span className="max-w-[120px] truncate">{profile.full_name}</span>
               <ChevronDown className="h-3 w-3" />
             </button>
             {userOpen && (
-              <div className="absolute top-full right-0 mt-1 w-48 rounded-md border border-border bg-card shadow-md z-50">
-                <div className="px-3 py-2 border-b">
-                  <p className="text-xs font-medium truncate">{profile.full_name}</p>
+              <div className="absolute top-full right-0 mt-1.5 w-48 rounded-lg border border-border bg-card shadow-lg z-50 overflow-hidden">
+                <div className="px-3 py-2 border-b border-border bg-amber-50/50">
+                  <p className="text-xs font-semibold truncate text-foreground">{profile.full_name}</p>
                   <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
                   <p className="text-xs text-muted-foreground capitalize">{role.replace("_", " ")}</p>
                 </div>
                 <Link href="/profile" onClick={closeAll}
-                  className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
-                  <User className="h-3.5 w-3.5" /> Mi perfil
+                  className={dropdownItem}>
+                  <User className="h-3.5 w-3.5 text-muted-foreground" /> Mi perfil
                 </Link>
                 {role === "super_admin" && clients.length > 1 && (
                   <Link href="/select-client" onClick={closeAll}
-                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors">
-                    <RefreshCcw className="h-3.5 w-3.5" /> Cambiar cliente
+                    className={dropdownItem}>
+                    <RefreshCcw className="h-3.5 w-3.5 text-muted-foreground" /> Cambiar cliente
                   </Link>
                 )}
                 <button onClick={() => { closeAll(); signOut(); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors text-destructive">
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-rose-50 transition-colors">
                   <LogOut className="h-3.5 w-3.5" /> Cerrar sesión
                 </button>
               </div>
@@ -345,66 +340,70 @@ export function Navbar() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t bg-background px-4 py-3 space-y-1">
+        <div className="md:hidden border-t border-white/10 bg-navbar-bg px-4 py-3 space-y-0.5">
           {role === "super_admin" && clients.length > 1 && (
             <div className="mb-3">
-              <p className="text-xs text-muted-foreground px-1 mb-1">Cliente activo</p>
+              <p className="text-xs text-white/50 px-1 mb-1 font-medium uppercase tracking-wider">Cliente activo</p>
               <select value={selectedClientId ?? ""} onChange={(e) => { selectClient(e.target.value); setMobileOpen(false); }}
-                className="w-full rounded border border-input px-2 py-1.5 text-sm bg-background">
-                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                className="w-full rounded-md border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-white focus:outline-none focus:border-brand-gold">
+                {clients.map((c) => <option key={c.id} value={c.id} className="bg-card text-foreground">{c.name}</option>)}
               </select>
             </div>
           )}
           {visibleNavItems.map((item) => (
             <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
               className={cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium",
-                pathname === item.href ? "bg-amber-700 text-white" : "text-muted-foreground hover:bg-muted")}>
+                pathname === item.href ? "bg-brand-gold text-brand-brown font-semibold" : "text-white/75 hover:bg-white/10 hover:text-white")}>
               <item.icon className="h-4 w-4" />
               {item.label}
             </Link>
           ))}
-          <div className="border-t pt-2 mt-2">
-            <p className="text-xs text-muted-foreground px-3 mb-1 font-medium uppercase">Reportes</p>
+
+          <div className="border-t border-white/10 pt-2 mt-2">
+            <p className="text-xs text-white/50 px-3 mb-1 font-medium uppercase tracking-wider">Reportes</p>
             {REPORTS_ITEMS.map((item) => (
               <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
-                className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">{item.label}</Link>
+                className="block rounded-md px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white">{item.label}</Link>
             ))}
           </div>
+
           {visibleQuotesItems.length > 0 && (
-            <div className="border-t pt-2 mt-2">
-              <p className="text-xs text-muted-foreground px-3 mb-1 font-medium uppercase">Cotizaciones</p>
+            <div className="border-t border-white/10 pt-2 mt-2">
+              <p className="text-xs text-white/50 px-3 mb-1 font-medium uppercase tracking-wider">Cotizaciones</p>
               {visibleQuotesItems.map((item) => (
                 <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
-                  className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">{item.label}</Link>
+                  className="block rounded-md px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white">{item.label}</Link>
               ))}
             </div>
           )}
-          <div className="border-t pt-2 mt-2">
-            <p className="text-xs text-muted-foreground px-3 mb-1 font-medium uppercase">
+
+          <div className="border-t border-white/10 pt-2 mt-2">
+            <p className="text-xs text-white/50 px-3 mb-1 font-medium uppercase tracking-wider">
               Admin {pendingCount > 0 && `(${pendingCount})`}
             </p>
             {visibleAdminItems.map((item) => (
               <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
-                className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">{item.label}</Link>
+                className="block rounded-md px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white">{item.label}</Link>
             ))}
             {role === "super_admin" && SUPER_ADMIN_ITEMS.map((item) => (
               <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}
-                className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">{item.label}</Link>
+                className="block rounded-md px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white">{item.label}</Link>
             ))}
           </div>
-          <div className="border-t pt-2 mt-2">
+
+          <div className="border-t border-white/10 pt-2 mt-2">
             <Link href="/profile" onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white">
               <User className="h-4 w-4" /> Mi perfil
             </Link>
             {role === "super_admin" && clients.length > 1 && (
               <Link href="/select-client" onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white">
                 <RefreshCcw className="h-4 w-4" /> Cambiar cliente
               </Link>
             )}
             <button onClick={() => { setMobileOpen(false); signOut(); }}
-              className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-muted">
+              className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-rose-300 hover:bg-white/10">
               <LogOut className="h-4 w-4" /> Cerrar sesión
             </button>
           </div>

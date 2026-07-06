@@ -59,6 +59,12 @@
   --color-brand-coral:  oklch(0.497 0.196 34);  /* #C1440E terracotta      */
   --color-brand-cream:  oklch(0.984 0.009 82);  /* #FDF8F3 cream bg        */
   --color-brand-brown:  oklch(0.237 0.046 43);  /* #3D2817 dark warm text  */
+  --color-navbar-bg:    oklch(0.213 0.046 40);  /* #3A1D09 very dark warm brown for navbar */
+
+  /* ── Warm shadows (replaces cold gray defaults) ─────────────────────────── */
+  --shadow-sm: 0 1px 3px 0 oklch(0.237 0.046 43 / 0.10), 0 1px 2px -1px oklch(0.237 0.046 43 / 0.07);
+  --shadow-md: 0 4px 8px -1px oklch(0.237 0.046 43 / 0.12), 0 2px 4px -2px oklch(0.237 0.046 43 / 0.08);
+  --shadow-lg: 0 10px 20px -3px oklch(0.237 0.046 43 / 0.12), 0 4px 8px -4px oklch(0.237 0.046 43 / 0.08);
 }
 
 :root {
@@ -72,7 +78,7 @@
   --primary: oklch(0.497 0.196 34);            /* #C1440E coral / terracotta  */
   --primary-foreground: oklch(0.99 0 0);       /* white                       */
   --secondary: oklch(0.963 0.016 79);          /* warm light cream            */
-  --secondary-foreground: oklch(0.32 0.047 45);
+  --secondary-foreground: oklch(0.497 0.196 34);  /* coral for secondary buttons */
   --muted: oklch(0.963 0.016 79);              /* warm muted bg               */
   --muted-foreground: oklch(0.497 0.033 51);   /* warm gray-brown             */
   --accent: oklch(0.728 0.128 63);             /* #E8A33D golden/mustard      */
@@ -140,5 +146,27 @@
   }
   html {
     @apply font-sans;
+  }
+
+  /* ── Global form label styling ──────────────────────────────────────────── */
+  label {
+    font-weight: 600;
+    color: oklch(0.237 0.046 43); /* brand-brown */
+  }
+
+  /* ── Inputs / selects: white bg on cream, coral focus border ────────────── */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    background-color: white;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus-visible,
+  select:focus,
+  select:focus-visible,
+  textarea:focus,
+  textarea:focus-visible {
+    border-color: oklch(0.497 0.196 34); /* coral */
+    outline-color: oklch(0.497 0.196 34 / 0.25);
   }
 }
