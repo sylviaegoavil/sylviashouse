@@ -97,7 +97,26 @@ export function Navbar() {
   const closeAll = () => { setReportsOpen(false); setQuotesOpen(false); setAdminOpen(false); setUserOpen(false); };
 
   if (loading) return null;
-  if (!profile) return null;
+
+  // Auth loaded but no profile — show minimal header so user can always sign out
+  if (!profile) {
+    return (
+      <header className="sticky top-0 z-50 bg-navbar-bg shadow-md">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
+          <Link href="/" className="flex items-center gap-2 shrink-0">
+            <span className="text-base font-bold tracking-tight text-brand-gold">Sylvia&apos;s House</span>
+          </Link>
+          <button
+            onClick={() => signOut()}
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-white/75 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            Cerrar sesión
+          </button>
+        </div>
+      </header>
+    );
+  }
 
   // ─── READONLY nav ─────────────────────────────────────────────────────────
   if (role === "readonly") {
