@@ -67,10 +67,19 @@ export default function ConfiguracionPage() {
       const data = await res.json();
       if (data) {
         setForm({
-          ...EMPTY,
-          ...data,
+          id:            data.id,
+          company_name:  data.company_name  ?? "",
+          trade_name:    data.trade_name    ?? "",
+          ruc:           data.ruc           ?? "",
+          address:       data.address       ?? "",
+          district:      data.district      ?? "",
+          phone:         data.phone         ?? "",
+          email:         data.email         ?? "",
+          advisor_name:  data.advisor_name  ?? "",
+          advisor_role:  data.advisor_role  ?? "",
+          advisor_phone: data.advisor_phone ?? "",
           bank_accounts: Array.isArray(data.bank_accounts) ? data.bank_accounts : [],
-          logo_url: data.logo_url ?? null,
+          logo_url:      data.logo_url ?? null,
         });
       }
     }

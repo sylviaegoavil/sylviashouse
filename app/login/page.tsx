@@ -29,16 +29,7 @@ function LoginForm() {
         setError("Credenciales incorrectas. Verifica tu email y contraseña.");
       } else {
         const redirect = searchParams.get("redirect");
-        if (redirect) {
-          router.push(redirect);
-        } else {
-          // Check role to decide where to land
-          const meRes = await fetch("/api/auth/me");
-          const meData = meRes.ok ? await meRes.json() : null;
-          const isSuperAdmin = meData?.profile?.role === "super_admin";
-          const clientCount = (meData?.clients ?? []).filter((c: { is_active: boolean }) => c.is_active).length;
-          router.push(isSuperAdmin && clientCount > 1 ? "/select-client" : "/dashboard");
-        }
+        router.push(redirect ?? "/");
         router.refresh();
       }
     } catch {
