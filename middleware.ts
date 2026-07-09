@@ -31,10 +31,10 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Already on login: redirect to dashboard if logged in
+  // Already on login: redirect to home if already logged in
   if (pathname === "/login") {
     if (user) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return NextResponse.redirect(new URL("/", request.url));
     }
     return response;
   }

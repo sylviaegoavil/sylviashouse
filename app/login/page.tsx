@@ -30,7 +30,6 @@ function LoginForm() {
       } else {
         const redirect = searchParams.get("redirect");
         router.push(redirect ?? "/");
-        router.refresh();
       }
     } catch {
       setError("Error al iniciar sesión. Intenta de nuevo.");
