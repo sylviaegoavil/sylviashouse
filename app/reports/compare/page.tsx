@@ -116,7 +116,7 @@ export default function ComparePage() {
       </select>
       <select value={year} onChange={(e) => onYearChange(Number(e.target.value))}
         className="rounded border border-input px-2 py-1.5 text-sm">
-        {Array.from({ length: 10 }, (_, i) => 2026 + i).map((y) => <option key={y} value={y}>{y}</option>)}
+        {Array.from({ length: 12 }, (_, i) => 2024 + i).map((y) => <option key={y} value={y}>{y}</option>)}
       </select>
     </div>
   );

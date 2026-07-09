@@ -7,7 +7,7 @@ const MONTH_NAMES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const YEARS = Array.from({ length: 10 }, (_, i) => 2026 + i); // 2026–2035
+const YEARS = Array.from({ length: 12 }, (_, i) => 2024 + i); // 2024–2035
 
 interface MonthSelectorProps {
   value: string; // "YYYY-MM"
