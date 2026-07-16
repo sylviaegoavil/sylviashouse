@@ -100,6 +100,8 @@ export default function ProductsPage() {
   const [showBulk, setShowBulk] = useState(false);
   const [bulkPT, setBulkPT] = useState("");
   const [bulkGroup, setBulkGroup] = useState("");
+  const [bulkMonth, setBulkMonth] = useState(CURRENT_MONTH);
+  const [bulkYear, setBulkYear] = useState(CURRENT_YEAR);
   const [bulkQty, setBulkQty] = useState(1);
   const [bulkOnlyOrders, setBulkOnlyOrders] = useState(false);
   const [bulkConflict, setBulkConflict] = useState<"skip" | "overwrite">("skip");
@@ -120,8 +122,8 @@ export default function ProductsPage() {
         body: JSON.stringify({
           productTypeId: bulkPT,
           groupId: bulkGroup,
-          month,
-          year,
+          month: bulkMonth,
+          year: bulkYear,
           quantity: bulkQty,
           onlyWithOrders: bulkOnlyOrders,
           onConflict: bulkConflict,
@@ -411,11 +413,32 @@ export default function ProductsPage() {
         </CardHeader>
         {showBulk && (
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Registra un producto para cada día de{" "}
-              <strong>{MONTHS.find((m) => m.value === month)?.label} {year}</strong>{" "}
-              en el grupo seleccionado.
-            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Mes</label>
+                <select
+                  value={bulkMonth}
+                  onChange={(e) => setBulkMonth(Number(e.target.value))}
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {MONTHS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Año</label>
+                <select
+                  value={bulkYear}
+                  onChange={(e) => setBulkYear(Number(e.target.value))}
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {Array.from({ length: 12 }, (_, i) => 2024 + i).map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1">
@@ -489,7 +512,7 @@ export default function ProductsPage() {
               className="w-full sm:w-auto bg-amber-700 hover:bg-amber-800 text-white"
             >
               <CalendarDays className="h-4 w-4 mr-2" />
-              {bulkLoading ? "Cargando..." : `Cargar a todo ${MONTHS.find((m) => m.value === month)?.label}`}
+              {bulkLoading ? "Cargando..." : `Cargar a ${MONTHS.find((m) => m.value === bulkMonth)?.label} ${bulkYear}`}
             </Button>
           </CardContent>
         )}
