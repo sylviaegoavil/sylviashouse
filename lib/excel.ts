@@ -631,7 +631,7 @@ export async function generateExcelProduccion(input: ExcelInput): Promise<Buffer
     { concept: "CENAS PRODUCCIÓN", dailyQty: cenasDailyQty, unitPrice: prices["CENA"] || 0 },
     ...prodSpecialRows,
     { concept: "CAFÉ", dailyQty: cafeDailyQty, unitPrice: prices["CAFÉ"] || 30 },
-    ...buildDynamicManualRows(manualProducts, year, month, ["CENAS PRODUCCIÓN"], prices),
+    ...buildDynamicManualRows(manualProducts, year, month, ["CENAS PRODUCCIÓN", "CAFÉ"], prices),
   ];
 
   // Sheet 1: CONSOLIDADO PRODUCCION

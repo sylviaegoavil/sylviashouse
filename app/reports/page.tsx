@@ -29,7 +29,7 @@ const EXCEL_TYPES = [
   {
     key: "PRODUCCION",
     label: "Excel Producción",
-    description: "Consolidado + Producción + Staff (con gaseosas automáticas)",
+    description: "Consolidado + Producción + Staff",
     color: "text-orange-700",
     bg: "bg-orange-50 border-orange-200",
   },

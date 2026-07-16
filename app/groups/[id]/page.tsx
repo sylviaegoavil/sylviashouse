@@ -86,22 +86,22 @@ export default function GroupDetailPage() {
 
       const mpData = await mpRes.json();
       if (Array.isArray(mpData)) {
-        // Transform into ManualProductRow[]
+        // Group by product name so records from old/deactivated types with the
+        // same name merge into a single row instead of showing duplicates.
         const entriesMap = new Map<string, Record<string, Array<{ qty: number; notes: string | null }>>>();
         for (const mp of mpData) {
           const name: string = mp.manual_product_types?.name ?? "Desconocido";
           const day = String(parseInt(mp.product_date.split("-")[2], 10));
           if (!entriesMap.has(name)) entriesMap.set(name, {});
-          const dayEntries = entriesMap.get(name)!;
-          if (!dayEntries[day]) dayEntries[day] = [];
-          dayEntries[day].push({ qty: mp.quantity, notes: mp.notes ?? null });
+          const daily = entriesMap.get(name)!;
+          if (!daily[day]) daily[day] = [];
+          daily[day].push({ qty: mp.quantity, notes: mp.notes ?? null });
         }
-        setManualProducts(
-          Array.from(entriesMap.entries()).map(([productName, dailyEntries]) => ({
-            productName,
-            dailyEntries,
-          }))
-        );
+        const rows = Array.from(entriesMap.entries()).map(([name, daily]) => ({
+          productName: name,
+          dailyEntries: daily,
+        }));
+        setManualProducts(rows);
       }
     } catch {
       toast.error("Error al cargar pedidos");

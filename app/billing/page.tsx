@@ -29,8 +29,6 @@ const GROUP_TO_EXCEL: Record<string, string> = {
   "PATIO ALMUERZOS": "PATIO",
   "PATIO CENAS": "PATIO",
 };
-const FIXED_CENAS_PRODUCCION = 25;
-const FIXED_CAFE_PRODUCCION = 2;
 
 interface BillingLine {
   concept: string;
@@ -127,12 +125,6 @@ export default function BillingPage() {
           const concept = g.name.includes("CENAS") ? "CENA" : "ALMUERZO";
           const unitPrice = prices[concept] || 0;
           if (qty > 0) lines.push({ concept: g.name, quantity: qty, unitPrice, subtotal: qty * unitPrice });
-        }
-
-        // Fixed values for PRODUCCION
-        if (eg === "PRODUCCION") {
-          lines.push({ concept: "CENAS (fijas)", quantity: FIXED_CENAS_PRODUCCION * days, unitPrice: prices["CENA"] || 0, subtotal: FIXED_CENAS_PRODUCCION * days * (prices["CENA"] || 0) });
-          lines.push({ concept: "CAFÉ (fijo)", quantity: FIXED_CAFE_PRODUCCION * days, unitPrice: prices["CAFÉ"] || 30, subtotal: FIXED_CAFE_PRODUCCION * days * (prices["CAFÉ"] || 30) });
         }
 
         // Special-price orders
