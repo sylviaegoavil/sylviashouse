@@ -612,9 +612,6 @@ export async function generateExcelProduccion(input: ExcelInput): Promise<Buffer
   // Cenas from manual products (entered day-by-day via /products)
   const cenasDailyQty = buildManualProductDailyQty(manualProducts, "CENAS PRODUCCIÓN", year, month);
 
-  // Café comes exclusively from manual products (loaded via bulk monthly load)
-  const cafeDailyQty = buildManualProductDailyQty(manualProducts, "CAFÉ", year, month);
-
   // Combined almuerzos: PRODUCCION + STAFF summed per day (consolidado only)
   const combinedAlmuerzosDailyQty: Record<string, number> = {};
   for (let d = 1; d <= days; d++) {
@@ -630,8 +627,7 @@ export async function generateExcelProduccion(input: ExcelInput): Promise<Buffer
     { concept: "ALMUERZOS PRODUCCIÓN", dailyQty: combinedAlmuerzosDailyQty, unitPrice: prices["ALMUERZO"] || 0 },
     { concept: "CENAS PRODUCCIÓN", dailyQty: cenasDailyQty, unitPrice: prices["CENA"] || 0 },
     ...prodSpecialRows,
-    { concept: "CAFÉ", dailyQty: cafeDailyQty, unitPrice: prices["CAFÉ"] || 30 },
-    ...buildDynamicManualRows(manualProducts, year, month, ["CENAS PRODUCCIÓN", "CAFÉ"], prices),
+    ...buildDynamicManualRows(manualProducts, year, month, ["CENAS PRODUCCIÓN"], prices),
   ];
 
   // Sheet 1: CONSOLIDADO PRODUCCION
