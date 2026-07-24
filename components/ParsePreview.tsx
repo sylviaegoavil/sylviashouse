@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -29,10 +29,24 @@ export function ParsePreview({ preview }: ParsePreviewProps) {
   const { matched, unmatched, newWorkers, adicionales, errors, repeated, summary } =
     preview;
 
+  const [activeTab, setActiveTab] = useState("matched");
+  const [reviewOnly, setReviewOnly] = useState(false);
+
+  const needsReviewCount = matched.filter((m) => m.confidence < 1).length;
+
+  const displayedMatched = reviewOnly
+    ? matched.filter((m) => m.confidence < 1).sort((a, b) => a.confidence - b.confidence)
+    : matched;
+
+  function goToReview() {
+    setActiveTab("matched");
+    setReviewOnly(true);
+  }
+
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total pedidos</CardDescription>
@@ -71,10 +85,21 @@ export function ParsePreview({ preview }: ParsePreviewProps) {
             </CardTitle>
           </CardHeader>
         </Card>
+        <Card
+          className={`cursor-pointer transition-colors ${needsReviewCount > 0 ? "border-yellow-300 hover:bg-yellow-50/50" : ""}`}
+          onClick={needsReviewCount > 0 ? goToReview : undefined}
+        >
+          <CardHeader className="pb-2">
+            <CardDescription>Requieren revisión</CardDescription>
+            <CardTitle className={`text-2xl ${needsReviewCount > 0 ? "text-yellow-600" : "text-muted-foreground"}`}>
+              {needsReviewCount}
+            </CardTitle>
+          </CardHeader>
+        </Card>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="matched">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="matched" className="gap-2">
             <CheckCircle className="h-4 w-4" />
@@ -107,10 +132,30 @@ export function ParsePreview({ preview }: ParsePreviewProps) {
         <TabsContent value="matched">
           <Card>
             <CardHeader>
-              <CardTitle>Pedidos emparejados</CardTitle>
-              <CardDescription>
-                Estos pedidos fueron asociados a un trabajador
-              </CardDescription>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle>Pedidos emparejados</CardTitle>
+                  <CardDescription>
+                    Estos pedidos fueron asociados a un trabajador
+                  </CardDescription>
+                </div>
+                {/* Filter toggle */}
+                <div className="flex rounded-md border border-input overflow-hidden text-sm">
+                  <button
+                    onClick={() => setReviewOnly(false)}
+                    className={`px-3 py-1.5 transition-colors ${!reviewOnly ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted"}`}
+                  >
+                    Todos ({matched.length})
+                  </button>
+                  <button
+                    onClick={() => setReviewOnly(true)}
+                    className={`px-3 py-1.5 border-l border-input transition-colors ${reviewOnly ? "bg-yellow-500 text-white font-medium" : "hover:bg-muted"} ${needsReviewCount === 0 ? "opacity-40 cursor-default" : ""}`}
+                    disabled={needsReviewCount === 0}
+                  >
+                    Requieren revisión ({needsReviewCount})
+                  </button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="max-h-[400px] overflow-auto">
@@ -126,7 +171,7 @@ export function ParsePreview({ preview }: ParsePreviewProps) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {matched.map((m, i) => (
+                    {displayedMatched.map((m, i) => (
                       <TableRow key={i}>
                         <TableCell className="font-medium">
                           {m.worker?.full_name ?? "—"}
