@@ -35,6 +35,7 @@ export default function UploadPage() {
   });
   const [preview, setPreview] = useState<ParsePreviewResult | null>(null);
   const [manualAssignments, setManualAssignments] = useState<Map<number, Worker>>(new Map());
+  const [discardedRepeated, setDiscardedRepeated] = useState<Set<string>>(new Set());
   const [processing, setProcessing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDupWarning, setShowDupWarning] = useState(false);
@@ -96,6 +97,7 @@ export default function UploadPage() {
 
       setPreview(data as ParsePreviewResult);
       setManualAssignments(new Map());
+      setDiscardedRepeated(new Set());
       toast.success(
         `Procesado: ${data.summary.matchedCount} emparejados, ${data.summary.unmatchedCount} sin emparejar`
       );
@@ -116,8 +118,17 @@ export default function UploadPage() {
 
       try {
         // Build confirmed orders from matched results + manual assignments
+        // For discarded repeated groups, keep only the first occurrence per workerId|date
+        const seenRepeated = new Map<string, number>();
         const autoOrders: ConfirmedOrder[] = preview.matched
-          .filter((m) => m.worker)
+          .filter((m) => {
+            if (!m.worker) return false;
+            const key = `${m.worker.id}|${m.parsedOrder.date}`;
+            if (!discardedRepeated.has(key)) return true;
+            const seen = seenRepeated.get(key) ?? 0;
+            seenRepeated.set(key, seen + 1);
+            return seen === 0; // keep only the first occurrence
+          })
           .map((m) => ({
             workerId: m.worker!.id,
             date: m.parsedOrder.date,
@@ -136,9 +147,7 @@ export default function UploadPage() {
           })
         );
 
-        console.log(`[SAVE] lote total=${autoOrders.length + manualOrders.length} (auto=${autoOrders.length} manuales=${manualOrders.length})`);
-
-        const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
+const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
 
         const response = await fetch("/api/process-orders", {
           method: "POST",
@@ -170,7 +179,7 @@ export default function UploadPage() {
         setSaving(false);
       }
     },
-    [preview, manualAssignments]
+    [preview, manualAssignments, discardedRepeated]
   );
 
   // Confirm save — check for duplicates first
@@ -264,6 +273,15 @@ export default function UploadPage() {
                   return next;
                 });
               }}
+              discardedRepeated={discardedRepeated}
+              onToggleRepeated={(key) => {
+                setDiscardedRepeated((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(key)) next.delete(key);
+                  else next.add(key);
+                  return next;
+                });
+              }}
             />
 
           <div className="flex justify-end gap-4">
@@ -277,7 +295,7 @@ export default function UploadPage() {
             </Button>
             <Button
               onClick={handleConfirmSave}
-              disabled={saving || (preview.matched.length + manualAssignments.size) === 0}
+              disabled={saving || (preview.matched.length + manualAssignments.size - discardedRepeated.size) === 0}
               size="lg"
             >
               {saving ? (
@@ -288,7 +306,7 @@ export default function UploadPage() {
               ) : (
                 <>
                   <CheckCircle className="mr-2 h-4 w-4" />
-                  Confirmar y guardar ({preview.matched.length + manualAssignments.size} pedidos)
+                  Confirmar y guardar ({preview.matched.length + manualAssignments.size - discardedRepeated.size} pedidos)
                 </>
               )}
             </Button>

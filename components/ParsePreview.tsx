@@ -26,6 +26,8 @@ interface ParsePreviewProps {
   workers?: Worker[];
   manualAssignments?: Map<number, Worker>;
   onManualAssign?: (idx: number, worker: Worker | null) => void;
+  discardedRepeated?: Set<string>; // key = "workerId|date"
+  onToggleRepeated?: (key: string) => void;
 }
 
 // ─── Suggestion helpers (client-side, mirrors matcher logic) ─────────────────
@@ -199,7 +201,7 @@ function AssignWidget({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ParsePreview({ preview, workers = [], manualAssignments, onManualAssign }: ParsePreviewProps) {
+export function ParsePreview({ preview, workers = [], manualAssignments, onManualAssign, discardedRepeated, onToggleRepeated }: ParsePreviewProps) {
   const { matched, unmatched, newWorkers, adicionales, errors, repeated, summary } =
     preview;
 
@@ -209,6 +211,12 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
   const needsReviewCount = matched.filter((m) => m.confidence < 1).length;
   const assignedCount = manualAssignments?.size ?? 0;
   const effectiveUnmatched = unmatched.length - assignedCount;
+
+  const discardedCount = discardedRepeated?.size ?? 0;
+  const confirmedRepeatedCount = summary.repeatedCount - discardedCount;
+  // Each discarded repeated removes 1 order from the final save
+  const effectiveMatchedCount = summary.matchedCount + assignedCount - discardedCount;
+  const effectiveTotalCount = summary.totalOrders - discardedCount;
 
   const displayedMatched = reviewOnly
     ? matched.filter((m) => m.confidence < 1).sort((a, b) => a.confidence - b.confidence)
@@ -226,14 +234,14 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total pedidos</CardDescription>
-            <CardTitle className="text-2xl">{summary.totalOrders}</CardTitle>
+            <CardTitle className="text-2xl">{effectiveTotalCount}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Emparejados</CardDescription>
             <CardTitle className="text-2xl text-green-600">
-              {summary.matchedCount + assignedCount}
+              {effectiveMatchedCount}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -256,12 +264,18 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card className={summary.repeatedCount > 0 ? "border-orange-300" : ""}>
+        <Card
+          className={summary.repeatedCount > 0 ? "border-orange-300 cursor-pointer hover:bg-orange-50/50" : ""}
+          onClick={summary.repeatedCount > 0 ? () => setActiveTab("repeated") : undefined}
+        >
           <CardHeader className="pb-2">
             <CardDescription>Repetidos</CardDescription>
             <CardTitle className={`text-2xl ${summary.repeatedCount > 0 ? "text-orange-600" : ""}`}>
               {summary.repeatedCount}
             </CardTitle>
+            {discardedCount > 0 && (
+              <p className="text-xs text-muted-foreground">{discardedCount} descartado{discardedCount !== 1 ? "s" : ""}</p>
+            )}
           </CardHeader>
         </Card>
         <Card
@@ -282,7 +296,7 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
         <TabsList>
           <TabsTrigger value="matched" className="gap-2">
             <CheckCircle className="h-4 w-4" />
-            Emparejados ({matched.length + assignedCount})
+            Emparejados ({effectiveMatchedCount})
           </TabsTrigger>
           <TabsTrigger value="unmatched" className="gap-2">
             <AlertTriangle className="h-4 w-4" />
@@ -328,7 +342,7 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
                     onClick={() => setReviewOnly(false)}
                     className={`px-3 py-1.5 transition-colors ${!reviewOnly ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted"}`}
                   >
-                    Todos ({matched.length + assignedCount})
+                    Todos ({effectiveMatchedCount})
                   </button>
                   <button
                     onClick={() => setReviewOnly(true)}
@@ -581,11 +595,23 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
         <TabsContent value="repeated">
           <Card>
             <CardHeader>
-              <CardTitle>Pedidos repetidos</CardTitle>
-              <CardDescription>
-                Trabajadores con más de un pedido en el mismo día dentro de este TXT.
-                Se incluyen todos en el guardado — revisa si son legítimos o errores.
-              </CardDescription>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle>Pedidos repetidos</CardTitle>
+                  <CardDescription>
+                    Trabajadores con más de un pedido el mismo día. Decide caso por caso si guardar los {summary.repeatedCount > 1 ? "dos" : "ambos"} o solo uno.
+                  </CardDescription>
+                </div>
+                {repeated.length > 0 && (
+                  <div className="text-sm text-muted-foreground flex gap-3">
+                    <span>{summary.repeatedCount} repetido{summary.repeatedCount !== 1 ? "s" : ""}</span>
+                    <span className="text-green-600">·  {confirmedRepeatedCount} confirmado{confirmedRepeatedCount !== 1 ? "s" : ""}</span>
+                    {discardedCount > 0 && (
+                      <span className="text-orange-600">· {discardedCount} descartado{discardedCount !== 1 ? "s" : ""}</span>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {repeated.length === 0 ? (
@@ -593,46 +619,77 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
                   No se detectaron pedidos repetidos
                 </p>
               ) : (
-                <div className="max-h-[500px] overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Trabajador</TableHead>
-                        <TableHead>DNI</TableHead>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead className="text-center">Cantidad</TableHead>
-                        <TableHead>Pedidos</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {repeated.map((r, i) => (
-                        <TableRow key={i} className="align-top">
-                          <TableCell className="font-medium">{r.workerName}</TableCell>
-                          <TableCell className="font-mono text-sm">{r.docNumber}</TableCell>
-                          <TableCell>{r.date}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="secondary" className="bg-orange-100 text-orange-700">
-                              {r.count}x
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              {r.orders.map((o, j) => (
-                                <div key={j} className="text-sm">
-                                  {o.timestamp && (
-                                    <span className="text-muted-foreground mr-2 font-mono text-xs">
-                                      {o.timestamp}
-                                    </span>
-                                  )}
-                                  <span className="text-muted-foreground">{o.rawText}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="max-h-[500px] overflow-auto space-y-3">
+                  {repeated.map((r, i) => {
+                    const key = `${r.workerId}|${r.date}`;
+                    const isDiscarded = discardedRepeated?.has(key) ?? false;
+                    return (
+                      <div
+                        key={i}
+                        className={`rounded-lg border p-4 transition-colors ${
+                          isDiscarded
+                            ? "border-orange-200 bg-orange-50/50"
+                            : "border-green-200 bg-green-50/30"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          {/* Worker info */}
+                          <div className="space-y-0.5">
+                            <p className="font-medium">{r.workerName}</p>
+                            <p className="text-xs font-mono text-muted-foreground">{r.docNumber} · {r.date}</p>
+                          </div>
+                          {/* Controls */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isDiscarded ? (
+                              <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+                                Se guardará 1 pedido
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-green-100 text-green-700">
+                                Se guardarán {r.count} pedidos
+                              </Badge>
+                            )}
+                            <button
+                              onClick={() => onToggleRepeated?.(key)}
+                              className={`text-xs px-3 py-1.5 rounded border font-medium transition-colors ${
+                                isDiscarded
+                                  ? "border-green-400 text-green-700 hover:bg-green-50"
+                                  : "border-orange-300 text-orange-700 hover:bg-orange-50"
+                              }`}
+                            >
+                              {isDiscarded ? "Confirmar doble" : "Descartar duplicado"}
+                            </button>
+                          </div>
+                        </div>
+                        {/* Orders list */}
+                        <div className="mt-3 space-y-1.5">
+                          {r.orders.map((o, j) => {
+                            const isDropped = isDiscarded && j > 0;
+                            return (
+                              <div
+                                key={j}
+                                className={`flex items-start gap-2 text-sm ${isDropped ? "opacity-40" : ""}`}
+                              >
+                                <span className={`shrink-0 text-xs font-mono px-1.5 py-0.5 rounded ${
+                                  j === 0 ? "bg-green-100 text-green-700" : isDropped ? "bg-red-100 text-red-500" : "bg-orange-100 text-orange-700"
+                                }`}>
+                                  {j === 0 ? "1° " : isDropped ? "✕" : `${j + 1}°`}
+                                </span>
+                                {o.timestamp && (
+                                  <span className="text-muted-foreground font-mono text-xs shrink-0 pt-0.5">
+                                    {o.timestamp}
+                                  </span>
+                                )}
+                                <span className={`text-muted-foreground ${isDropped ? "line-through" : ""}`}>
+                                  {o.rawText}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

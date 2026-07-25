@@ -84,21 +84,16 @@ export function matchWorkers(
   return parsedOrders.map((order) => matchSingleOrder(order, workers, dniMap));
 }
 
-const _DIAG_DNIS = new Set(["75851560", "75330636"]);
-
 function matchSingleOrder(
   order: ParsedOrder,
   workers: Worker[],
   dniMap: Map<string, Worker>
 ): MatchResult {
   const { possibleDni, possibleNames } = order;
-  const _isDiag = possibleDni ? _DIAG_DNIS.has(possibleDni) : false;
-  if (_isDiag) console.log(`[DIAG-MATCH] order dni=${possibleDni} names=${JSON.stringify(possibleNames)} date=${order.date}`);
 
   // ── Step 1: Exact DNI match ──
   if (possibleDni && possibleDni.length === 8) {
     const dniWorker = dniMap.get(possibleDni);
-    if (_isDiag) console.log(`[DIAG-MATCH] dniMap lookup for ${possibleDni}: found=${!!dniWorker}${dniWorker ? ` (${dniWorker.full_name})` : ""}`);
     if (dniWorker) {
       if (possibleNames.length > 0 && !nameMatchesWorker(possibleNames, dniWorker)) {
         return {
