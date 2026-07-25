@@ -88,18 +88,22 @@ export async function POST(request: NextRequest) {
       preExistingMap.set(`${row.worker_id}|${row.order_date}`, row.id);
     }
 
-    for (const order of confirmedOrders) {
+    console.log(`[ORDERS] Lote recibido: ${confirmedOrders.length} pedidos | preExistingMap: ${preExistingMap.size} entradas previas`);
+    let skippedCount = 0;
+
+    for (let i = 0; i < confirmedOrders.length; i++) {
+      const order = confirmedOrders[i];
       const key = `${order.workerId}|${order.date}`;
       const existingId = preExistingMap.get(key);
 
       if (existingId) {
         if (replaceDuplicates) {
           await supabase.from("orders").delete().eq("id", existingId);
-          // Remove from map so subsequent repeated orders for same key also insert
           preExistingMap.delete(key);
           ordersReplaced++;
         } else {
-          // Skip pre-existing duplicate; repeated orders in the same batch are NOT in the map
+          skippedCount++;
+          console.log(`[ORDERS][SKIP #${skippedCount}] idx=${i} worker_id=${order.workerId} date=${order.date} razon=preExistente(${existingId}) rawText="${order.rawText?.slice(0, 80)}"`);
           continue;
         }
       }
@@ -113,6 +117,8 @@ export async function POST(request: NextRequest) {
       });
 
       if (orderErr) {
+        skippedCount++;
+        console.log(`[ORDERS][ERROR #${skippedCount}] idx=${i} worker_id=${order.workerId} date=${order.date} error="${orderErr.message}" code=${orderErr.code} rawText="${order.rawText?.slice(0, 80)}"`);
         errors.push({
           rawText: order.rawText,
           date: order.date,
@@ -123,6 +129,8 @@ export async function POST(request: NextRequest) {
         ordersCreated++;
       }
     }
+
+    console.log(`[ORDERS] Resultado: creados=${ordersCreated} reemplazados=${ordersReplaced} omitidos=${skippedCount} errores=${errors.length}`);
 
     // ── 3. Save adicionales as orders with worker_id = null or a special marker ──
     // We store adicionales in the orders table with a note

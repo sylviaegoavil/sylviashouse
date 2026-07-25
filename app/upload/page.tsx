@@ -116,24 +116,29 @@ export default function UploadPage() {
 
       try {
         // Build confirmed orders from matched results + manual assignments
-        const confirmedOrders: ConfirmedOrder[] = [
-          ...preview.matched
-            .filter((m) => m.worker)
-            .map((m) => ({
-              workerId: m.worker!.id,
-              date: m.parsedOrder.date,
-              source: "whatsapp" as const,
-              notes: m.parsedOrder.rawText,
-              rawText: m.parsedOrder.rawText,
-            })),
-          ...Array.from(manualAssignments.entries()).map(([idx, worker]) => ({
+        const autoOrders: ConfirmedOrder[] = preview.matched
+          .filter((m) => m.worker)
+          .map((m) => ({
+            workerId: m.worker!.id,
+            date: m.parsedOrder.date,
+            source: "whatsapp" as const,
+            notes: m.parsedOrder.rawText,
+            rawText: m.parsedOrder.rawText,
+          }));
+
+        const manualOrders: ConfirmedOrder[] = Array.from(manualAssignments.entries()).map(
+          ([idx, worker]) => ({
             workerId: worker.id,
             date: preview.unmatched[idx].parsedOrder.date,
             source: "whatsapp" as const,
             notes: preview.unmatched[idx].parsedOrder.rawText,
             rawText: preview.unmatched[idx].parsedOrder.rawText,
-          })),
-        ];
+          })
+        );
+
+        console.log(`[SAVE] lote total=${autoOrders.length + manualOrders.length} (auto=${autoOrders.length} manuales=${manualOrders.length})`);
+
+        const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
 
         const response = await fetch("/api/process-orders", {
           method: "POST",
@@ -165,7 +170,7 @@ export default function UploadPage() {
         setSaving(false);
       }
     },
-    [preview]
+    [preview, manualAssignments]
   );
 
   // Confirm save — check for duplicates first
