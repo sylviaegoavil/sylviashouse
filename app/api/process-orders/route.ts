@@ -71,23 +71,35 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 2. Process confirmed orders ──
-    for (const order of confirmedOrders) {
-      // Check for existing order (duplicate)
-      const { data: existing } = await supabase
-        .from("orders")
-        .select("id")
-        .eq("worker_id", order.workerId)
-        .eq("group_id", groupId)
-        .eq("order_date", order.date)
-        .maybeSingle();
+    // Build a snapshot of orders that ALREADY exist in the DB before this run.
+    // Duplicate detection compares only against this snapshot so that legitimate
+    // repeated orders within the same batch (same worker + same day, confirmed by
+    // the user in the "Repetidos" tab) are still inserted.
+    const dates = [...new Set(confirmedOrders.map((o) => o.date))];
+    const { data: preExisting } = await supabase
+      .from("orders")
+      .select("id, worker_id, order_date")
+      .eq("group_id", groupId)
+      .in("order_date", dates);
 
-      if (existing) {
+    // Map of "workerId|date" → order id for pre-existing rows
+    const preExistingMap = new Map<string, string>();
+    for (const row of preExisting ?? []) {
+      preExistingMap.set(`${row.worker_id}|${row.order_date}`, row.id);
+    }
+
+    for (const order of confirmedOrders) {
+      const key = `${order.workerId}|${order.date}`;
+      const existingId = preExistingMap.get(key);
+
+      if (existingId) {
         if (replaceDuplicates) {
-          // Delete existing and insert new
-          await supabase.from("orders").delete().eq("id", existing.id);
+          await supabase.from("orders").delete().eq("id", existingId);
+          // Remove from map so subsequent repeated orders for same key also insert
+          preExistingMap.delete(key);
           ordersReplaced++;
         } else {
-          // Skip duplicate
+          // Skip pre-existing duplicate; repeated orders in the same batch are NOT in the map
           continue;
         }
       }
