@@ -114,10 +114,13 @@ export interface ParseErrorEntry {
 
 export type MatchType =
   | "exact_dni"
+  | "approx_dni"
+  | "incomplete_dni"
   | "fuzzy_name"
   | "partial_lastname"
   | "partial_firstname"
   | "single_name"
+  | "manual"
   | "none";
 
 export interface MatchResult {

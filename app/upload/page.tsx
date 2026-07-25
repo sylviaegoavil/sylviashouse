@@ -22,16 +22,19 @@ import type {
   UploadConfig,
   ConfirmedOrder,
   Group,
+  Worker,
 } from "@/lib/types";
 
 export default function UploadPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [workers, setWorkers] = useState<Worker[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [uploadConfig, setUploadConfig] = useState<UploadConfig>({
     mode: "full_file",
   });
   const [preview, setPreview] = useState<ParsePreviewResult | null>(null);
+  const [manualAssignments, setManualAssignments] = useState<Map<number, Worker>>(new Map());
   const [processing, setProcessing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDupWarning, setShowDupWarning] = useState(false);
@@ -46,6 +49,15 @@ export default function UploadPage() {
       })
       .catch(() => toast.error("Error al cargar grupos"));
   }, []);
+
+  // Load workers when group changes
+  useEffect(() => {
+    if (!selectedGroupId) { setWorkers([]); return; }
+    fetch(`/api/workers?groupId=${selectedGroupId}`)
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setWorkers(data); })
+      .catch(() => {});
+  }, [selectedGroupId]);
 
   // Process file
   const handleProcess = useCallback(async () => {
@@ -83,6 +95,7 @@ export default function UploadPage() {
       }
 
       setPreview(data as ParsePreviewResult);
+      setManualAssignments(new Map());
       toast.success(
         `Procesado: ${data.summary.matchedCount} emparejados, ${data.summary.unmatchedCount} sin emparejar`
       );
@@ -102,16 +115,25 @@ export default function UploadPage() {
       setShowDupWarning(false);
 
       try {
-        // Build confirmed orders from matched results
-        const confirmedOrders: ConfirmedOrder[] = preview.matched
-          .filter((m) => m.worker)
-          .map((m) => ({
-            workerId: m.worker!.id,
-            date: m.parsedOrder.date,
+        // Build confirmed orders from matched results + manual assignments
+        const confirmedOrders: ConfirmedOrder[] = [
+          ...preview.matched
+            .filter((m) => m.worker)
+            .map((m) => ({
+              workerId: m.worker!.id,
+              date: m.parsedOrder.date,
+              source: "whatsapp" as const,
+              notes: m.parsedOrder.rawText,
+              rawText: m.parsedOrder.rawText,
+            })),
+          ...Array.from(manualAssignments.entries()).map(([idx, worker]) => ({
+            workerId: worker.id,
+            date: preview.unmatched[idx].parsedOrder.date,
             source: "whatsapp" as const,
-            notes: m.parsedOrder.rawText,
-            rawText: m.parsedOrder.rawText,
-          }));
+            notes: preview.unmatched[idx].parsedOrder.rawText,
+            rawText: preview.unmatched[idx].parsedOrder.rawText,
+          })),
+        ];
 
         const response = await fetch("/api/process-orders", {
           method: "POST",
@@ -225,7 +247,19 @@ export default function UploadPage() {
       {/* Preview */}
       {preview && !result && (
         <>
-          <ParsePreview preview={preview} />
+          <ParsePreview
+              preview={preview}
+              workers={workers}
+              manualAssignments={manualAssignments}
+              onManualAssign={(idx, worker) => {
+                setManualAssignments((prev) => {
+                  const next = new Map(prev);
+                  if (worker) next.set(idx, worker);
+                  else next.delete(idx);
+                  return next;
+                });
+              }}
+            />
 
           <div className="flex justify-end gap-4">
             <Button
@@ -238,7 +272,7 @@ export default function UploadPage() {
             </Button>
             <Button
               onClick={handleConfirmSave}
-              disabled={saving || preview.matched.length === 0}
+              disabled={saving || (preview.matched.length + manualAssignments.size) === 0}
               size="lg"
             >
               {saving ? (
@@ -249,7 +283,7 @@ export default function UploadPage() {
               ) : (
                 <>
                   <CheckCircle className="mr-2 h-4 w-4" />
-                  Confirmar y guardar ({preview.matched.length} pedidos)
+                  Confirmar y guardar ({preview.matched.length + manualAssignments.size} pedidos)
                 </>
               )}
             </Button>

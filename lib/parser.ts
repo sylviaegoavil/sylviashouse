@@ -122,10 +122,11 @@ const NEW_WORKER_ANNOUNCE = /SE\s+AGREGA\s+NUEVO\s+PERSONAL/i;
 // ─── DNI extraction ──────────────────────────────────────────────────────────
 
 /**
- * Finds 8- or 9-digit number sequences that could be a DNI.
+ * Finds 7-, 8-, or 9-digit number sequences that could be a DNI.
+ * 7-digit captures truncated DNIs (missing last digit).
  * We look for sequences NOT preceded/followed by other digits.
  */
-const DNI_REGEX = /(?<!\d)(\d{8,9})(?!\d)/;
+const DNI_REGEX = /(?<!\d)(\d{7,9})(?!\d)/;
 
 // ─── Main parser function ────────────────────────────────────────────────────
 
@@ -906,6 +907,11 @@ const FOOD_KEYWORDS = [
   "gaseosa",
   "postre",
   "ensalada",
+  "crema",
+  "pimiento",
+  "alberjita",
+  "alberja",
+  "arveja",
   "con",
 ];
 
