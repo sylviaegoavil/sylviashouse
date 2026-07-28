@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from "@/lib/supabase-server";
 import { getAuthContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Faltan parámetros" }, { status: 400 });
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = createServiceRoleSupabaseClient();
   const { error } = await supabase.from("no_order_days").insert({
     group_id: groupId,
     no_order_date: date,
@@ -63,7 +63,7 @@ export async function DELETE(request: NextRequest) {
     return Response.json({ error: "Faltan parámetros" }, { status: 400 });
   }
 
-  const supabase = createServerSupabaseClient();
+  const supabase = createServiceRoleSupabaseClient();
   const { error } = await supabase
     .from("no_order_days")
     .delete()
