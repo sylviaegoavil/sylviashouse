@@ -5,7 +5,7 @@ import { logAudit } from "@/lib/audit";
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const ctx = await getAuthContext();
@@ -13,7 +13,7 @@ export async function DELETE(
       return Response.json({ error: "No autorizado" }, { status: 403 });
     }
 
-    const orderId = params.id;
+    const { id: orderId } = await params;
     if (!orderId) {
       return Response.json({ error: "Falta el id del pedido" }, { status: 400 });
     }
