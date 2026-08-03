@@ -95,10 +95,17 @@ export interface DetectedNewWorker {
   groupName: string;
 }
 
+export interface AdicionalRecord {
+  date: string;
+  rawText: string;
+  count: number;
+}
+
 export interface ParseResult {
   orders: ParsedOrder[];
   newWorkers: DetectedNewWorker[];
-  adicionales: Record<string, number>; // date -> count
+  adicionales: Record<string, number>; // date -> count (aggregate)
+  adicionalesDetailed: AdicionalRecord[]; // individual records for per-item display
   ignoredLines: string[];
   errors: ParseErrorEntry[];
 }
@@ -142,6 +149,7 @@ export interface ParsePreviewResult {
   unmatched: MatchResult[];
   newWorkers: DetectedNewWorker[];
   adicionales: Record<string, number>;
+  adicionalesDetailed: AdicionalRecord[];
   errors: ParseErrorEntry[];
   duplicates: DuplicateInfo[];
   repeated: RepeatedOrderGroup[];

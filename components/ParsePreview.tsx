@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckCircle, AlertTriangle, UserPlus, Package, Copy, UserCheck } from "lucide-react";
-import type { ParsePreviewResult, Worker, ParsedOrder } from "@/lib/types";
+import type { ParsePreviewResult, Worker, ParsedOrder, AdicionalRecord, MatchResult } from "@/lib/types";
 
 interface ParsePreviewProps {
   preview: ParsePreviewResult;
@@ -28,6 +28,8 @@ interface ParsePreviewProps {
   onManualAssign?: (idx: number, worker: Worker | null) => void;
   discardedRepeated?: Set<string>; // key = "workerId|date"
   onToggleRepeated?: (key: string) => void;
+  markedAsAdicional?: Set<number>; // indices in preview.matched (PRODUCCIÓN only)
+  onToggleAdicional?: (idx: number) => void;
 }
 
 // ─── Suggestion helpers (client-side, mirrors matcher logic) ─────────────────
@@ -199,11 +201,116 @@ function AssignWidget({
   );
 }
 
+// ─── Adicionales PRODUCCIÓN view ─────────────────────────────────────────────
+
+function AdiccionalesProduccionView({
+  adicionalesDetailed,
+  markedAsAdicional,
+  matchedOrders,
+  onRestoreOrder,
+}: {
+  adicionalesDetailed: AdicionalRecord[];
+  markedAsAdicional?: Set<number>;
+  matchedOrders: MatchResult[];
+  onRestoreOrder?: (idx: number) => void;
+}) {
+  const markedRows = markedAsAdicional
+    ? Array.from(markedAsAdicional).map((idx) => ({
+        idx,
+        order: matchedOrders[idx],
+      })).filter((r) => r.order?.worker)
+    : [];
+
+  const hasAny = adicionalesDetailed.length > 0 || markedRows.length > 0;
+
+  if (!hasAny) {
+    return (
+      <p className="text-muted-foreground text-center py-8">
+        No se detectaron adicionales
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Natural adicionales detected from chat */}
+      {adicionalesDetailed.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold text-muted-foreground mb-2">
+            Detectados automáticamente ({adicionalesDetailed.length} registro{adicionalesDetailed.length !== 1 ? "s" : ""}, total {adicionalesDetailed.reduce((s, r) => s + r.count, 0)})
+          </p>
+          <div className="max-h-[350px] overflow-auto rounded border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <th className="py-2 px-3 text-left font-medium w-28">Fecha</th>
+                  <th className="py-2 px-3 text-left font-medium w-12">Cant.</th>
+                  <th className="py-2 px-3 text-left font-medium">Texto detectado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adicionalesDetailed.map((rec, i) => (
+                  <tr key={i} className="border-b last:border-0 hover:bg-muted/20">
+                    <td className="py-2 px-3 font-mono text-xs whitespace-nowrap">{rec.date}</td>
+                    <td className="py-2 px-3 text-center">
+                      <span className="bg-blue-100 text-blue-700 text-xs font-mono px-1.5 py-0.5 rounded">
+                        {rec.count}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 text-muted-foreground text-xs break-words max-w-xs">
+                      {rec.rawText.slice(0, 150)}{rec.rawText.length > 150 ? "…" : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* User-marked adicionales (from Matched tab toggle) */}
+      {markedRows.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold text-muted-foreground mb-2">
+            Marcados manualmente como adicional ({markedRows.length})
+          </p>
+          <div className="space-y-2">
+            {markedRows.map(({ idx, order }) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50/40 px-4 py-3"
+              >
+                <div className="space-y-0.5 min-w-0">
+                  <p className="font-medium text-sm">{order.worker!.full_name}</p>
+                  <p className="text-xs font-mono text-muted-foreground">
+                    {order.worker!.doc_number} · {order.parsedOrder.date}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate max-w-xs">
+                    {order.parsedOrder.rawText}
+                  </p>
+                </div>
+                <button
+                  onClick={() => onRestoreOrder?.(idx)}
+                  className="text-xs px-3 py-1.5 rounded border border-green-400 text-green-700 hover:bg-green-50 whitespace-nowrap shrink-0"
+                >
+                  Restaurar pedido
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ParsePreview({ preview, workers = [], manualAssignments, onManualAssign, discardedRepeated, onToggleRepeated }: ParsePreviewProps) {
-  const { matched, unmatched, newWorkers, adicionales, errors, repeated, summary } =
+export function ParsePreview({ preview, workers = [], manualAssignments, onManualAssign, discardedRepeated, onToggleRepeated, markedAsAdicional, onToggleAdicional }: ParsePreviewProps) {
+  const { matched, unmatched, newWorkers, adicionales, adicionalesDetailed, errors, repeated, summary } =
     preview;
+
+  const isProduccion = /PRODUCC/i.test(preview.groupName);
 
   const [activeTab, setActiveTab] = useState("matched");
   const [reviewOnly, setReviewOnly] = useState(false);
@@ -214,9 +321,11 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
 
   const discardedCount = discardedRepeated?.size ?? 0;
   const confirmedRepeatedCount = summary.repeatedCount - discardedCount;
-  // Each discarded repeated removes 1 order from the final save
-  const effectiveMatchedCount = summary.matchedCount + assignedCount - discardedCount;
-  const effectiveTotalCount = summary.totalOrders - discardedCount;
+  const markedAdicionalCount = markedAsAdicional?.size ?? 0;
+  // Each discarded repeated or marked-as-adicional removes 1 order from the final save
+  const effectiveMatchedCount = summary.matchedCount + assignedCount - discardedCount - markedAdicionalCount;
+  const effectiveTotalCount = summary.totalOrders - discardedCount - markedAdicionalCount;
+  const effectiveAdicionalesTotal = summary.adicionalesTotal + markedAdicionalCount;
 
   const displayedMatched = reviewOnly
     ? matched.filter((m) => m.confidence < 1).sort((a, b) => a.confidence - b.confidence)
@@ -256,11 +365,14 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
+        <Card
+          className={effectiveAdicionalesTotal > 0 ? "cursor-pointer hover:bg-blue-50/50" : ""}
+          onClick={effectiveAdicionalesTotal > 0 ? () => setActiveTab("adicionales") : undefined}
+        >
           <CardHeader className="pb-2">
             <CardDescription>Adicionales</CardDescription>
             <CardTitle className="text-2xl text-blue-600">
-              {summary.adicionalesTotal}
+              {effectiveAdicionalesTotal}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -365,11 +477,15 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
                       <TableHead>Tipo match</TableHead>
                       <TableHead>Confianza</TableHead>
                       <TableHead>Texto original</TableHead>
+                      {isProduccion && <TableHead></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {displayedMatched.map((m, i) => (
-                      <TableRow key={i}>
+                    {displayedMatched.map((m, i) => {
+                      const origIdx = matched.indexOf(m);
+                      const isMarkedAdic = isProduccion && markedAsAdicional?.has(origIdx);
+                      return (
+                      <TableRow key={i} className={isMarkedAdic ? "opacity-50 bg-blue-50/40" : ""}>
                         <TableCell className="font-medium">
                           {m.worker?.full_name ?? "—"}
                         </TableCell>
@@ -393,9 +509,29 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate text-muted-foreground text-sm">
                           {m.parsedOrder.rawText}
+                          {m.parsedOrder.isAdditional && isProduccion && !isMarkedAdic && (
+                            <span className="ml-1 text-xs text-blue-500">(dice "adicional")</span>
+                          )}
                         </TableCell>
+                        {isProduccion && (
+                          <TableCell>
+                            {m.parsedOrder.isAdditional && (
+                              <button
+                                onClick={() => onToggleAdicional?.(origIdx)}
+                                className={`text-xs px-2 py-1 rounded border whitespace-nowrap transition-colors ${
+                                  isMarkedAdic
+                                    ? "border-green-400 text-green-700 hover:bg-green-50"
+                                    : "border-blue-300 text-blue-700 hover:bg-blue-50"
+                                }`}
+                              >
+                                {isMarkedAdic ? "Restaurar pedido" : "Marcar como adicional"}
+                              </button>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
-                    ))}
+                      );
+                    })}
                     {/* Manual assignments shown at bottom of matched tab */}
                     {!reviewOnly && manualAssignments && Array.from(manualAssignments.entries()).map(([idx, worker]) => (
                       <TableRow key={`manual-${idx}`} className="bg-green-50/40">
@@ -557,35 +693,46 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
         <TabsContent value="adicionales">
           <Card>
             <CardHeader>
-              <CardTitle>Adicionales por fecha</CardTitle>
+              <CardTitle>Adicionales{isProduccion ? " — PRODUCCIÓN" : " por fecha"}</CardTitle>
               <CardDescription>
-                Pedidos adicionales detectados (no asociados a un trabajador especifico)
+                {isProduccion
+                  ? "Pedidos adicionales detectados individualmente. Los marcados desde el tab Emparejados aparecen abajo."
+                  : "Pedidos adicionales detectados (no asociados a un trabajador específico)"}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {Object.keys(adicionales).length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  No se detectaron adicionales
-                </p>
+              {isProduccion ? (
+                <AdiccionalesProduccionView
+                  adicionalesDetailed={adicionalesDetailed ?? []}
+                  markedAsAdicional={markedAsAdicional}
+                  matchedOrders={matched}
+                  onRestoreOrder={onToggleAdicional}
+                />
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Cantidad</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Object.entries(adicionales)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([date, count]) => (
-                        <TableRow key={date}>
-                          <TableCell className="font-medium">{date}</TableCell>
-                          <TableCell>{count}</TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
+                Object.keys(adicionales).length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No se detectaron adicionales
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Cantidad</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.entries(adicionales)
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([date, count]) => (
+                          <TableRow key={date}>
+                            <TableCell className="font-medium">{date}</TableCell>
+                            <TableCell>{count}</TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                )
               )}
             </CardContent>
           </Card>

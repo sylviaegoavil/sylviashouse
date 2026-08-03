@@ -16,7 +16,20 @@ import type {
   DetectedNewWorker,
   ParseErrorEntry,
   UploadConfig,
+  AdicionalRecord,
 } from "./types";
+
+// ─── Adicional tracking helper ────────────────────────────────────────────────
+
+function addAdicional(
+  result: ParseResult,
+  date: string,
+  rawText: string,
+  count: number
+): void {
+  result.adicionales[date] = (result.adicionales[date] || 0) + count;
+  result.adicionalesDetailed.push({ date, rawText, count });
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -139,6 +152,7 @@ export function parseWhatsAppTxt(
     orders: [],
     newWorkers: [],
     adicionales: {},
+    adicionalesDetailed: [],
     ignoredLines: [],
     errors: [],
   };
@@ -194,8 +208,7 @@ export function parseWhatsAppTxt(
       if (currentDate) {
         const adicCount = detectAdicionales(fullText, groupName);
         if (adicCount > 0) {
-          result.adicionales[currentDate] =
-            (result.adicionales[currentDate] || 0) + adicCount;
+          addAdicional(result, currentDate, fullText.slice(0, 300), adicCount);
           continue;
         }
       }
@@ -232,7 +245,7 @@ export function parseWhatsAppTxt(
           if (shouldIgnore(cleaned)) { result.ignoredLines.push(cleaned); continue; }
           const adicCount = detectAdicionales(cleaned, groupName);
           if (adicCount > 0) {
-            result.adicionales[currentDate] = (result.adicionales[currentDate] || 0) + adicCount;
+            addAdicional(result, currentDate, line, adicCount);
             continue;
           }
           if (!looksLikeOrder(line, cleaned)) { result.ignoredLines.push(cleaned); continue; }
@@ -240,7 +253,7 @@ export function parseWhatsAppTxt(
           const parsed = parseOrderLine(cleaned, currentDate, lineCounter, timestamp);
           if (parsed) {
             if (parsed.isAdditional && /PATIO/i.test(groupName)) {
-              result.adicionales[currentDate] = (result.adicionales[currentDate] || 0) + 1;
+              addAdicional(result, currentDate, line, 1);
             } else {
               if (parsed.possibleDni && _WATCH_DNIS.has(parsed.possibleDni)) {
                 console.log(`[ORDER-DATE] ts="${timestamp}" dni=${parsed.possibleDni} order_date="${parsed.date}" currentDate="${currentDate}" raw="${cleaned}" (Sylvia compilation)`);
@@ -268,8 +281,7 @@ export function parseWhatsAppTxt(
     if (currentDate) {
       const adicCount = detectAdicionales(fullText, groupName);
       if (adicCount > 0) {
-        result.adicionales[currentDate] =
-          (result.adicionales[currentDate] || 0) + adicCount;
+        addAdicional(result, currentDate, fullText.slice(0, 300), adicCount);
         continue;
       }
     }
@@ -303,8 +315,7 @@ export function parseWhatsAppTxt(
       // Check if it looks like an adicional from non-Sylvia
       const singleAdic = detectAdicionales(cleaned, groupName);
       if (singleAdic > 0) {
-        result.adicionales[currentDate] =
-          (result.adicionales[currentDate] || 0) + singleAdic;
+        addAdicional(result, currentDate, line, singleAdic);
         continue;
       }
 
@@ -318,7 +329,7 @@ export function parseWhatsAppTxt(
       const parsed = parseOrderLine(cleaned, currentDate, lineCounter, timestamp);
       if (parsed) {
         if (parsed.isAdditional && /PATIO/i.test(groupName)) {
-          result.adicionales[currentDate] = (result.adicionales[currentDate] || 0) + 1;
+          addAdicional(result, currentDate, line, 1);
         } else {
           if (parsed.possibleDni && _WATCH_DNIS.has(parsed.possibleDni)) {
             console.log(`[ORDER-DATE] ts="${timestamp}" sender="${sender}" dni=${parsed.possibleDni} order_date="${parsed.date}" currentDate="${currentDate}" raw="${cleaned}"`);

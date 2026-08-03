@@ -36,6 +36,7 @@ export default function UploadPage() {
   const [preview, setPreview] = useState<ParsePreviewResult | null>(null);
   const [manualAssignments, setManualAssignments] = useState<Map<number, Worker>>(new Map());
   const [discardedRepeated, setDiscardedRepeated] = useState<Set<string>>(new Set());
+  const [markedAsAdicional, setMarkedAsAdicional] = useState<Set<number>>(new Set());
   const [processing, setProcessing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDupWarning, setShowDupWarning] = useState(false);
@@ -98,6 +99,7 @@ export default function UploadPage() {
       setPreview(data as ParsePreviewResult);
       setManualAssignments(new Map());
       setDiscardedRepeated(new Set());
+      setMarkedAsAdicional(new Set());
       toast.success(
         `Procesado: ${data.summary.matchedCount} emparejados, ${data.summary.unmatchedCount} sin emparejar`
       );
@@ -117,12 +119,14 @@ export default function UploadPage() {
       setShowDupWarning(false);
 
       try {
-        // Build confirmed orders from matched results + manual assignments
-        // For discarded repeated groups, keep only the first occurrence per workerId|date
+        // Build confirmed orders from matched results + manual assignments.
+        // For discarded repeated groups, keep only the first occurrence per workerId|date.
+        // For user-marked-as-adicional (PRODUCCIÓN), exclude from orders entirely.
         const seenRepeated = new Map<string, number>();
         const autoOrders: ConfirmedOrder[] = preview.matched
-          .filter((m) => {
+          .filter((m, idx) => {
             if (!m.worker) return false;
+            if (markedAsAdicional.has(idx)) return false;
             const key = `${m.worker.id}|${m.parsedOrder.date}`;
             if (!discardedRepeated.has(key)) return true;
             const seen = seenRepeated.get(key) ?? 0;
@@ -136,6 +140,14 @@ export default function UploadPage() {
             notes: m.parsedOrder.rawText,
             rawText: m.parsedOrder.rawText,
           }));
+
+        // Merge user-marked-as-adicional into the adicionales count
+        const adicionales = { ...preview.adicionales };
+        for (const idx of markedAsAdicional) {
+          const m = preview.matched[idx];
+          if (!m) continue;
+          adicionales[m.parsedOrder.date] = (adicionales[m.parsedOrder.date] || 0) + 1;
+        }
 
         const manualOrders: ConfirmedOrder[] = Array.from(manualAssignments.entries()).map(
           ([idx, worker]) => ({
@@ -157,7 +169,7 @@ const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
             fileName: preview.fileName,
             confirmedOrders,
             newWorkers: preview.newWorkers,
-            adicionales: preview.adicionales,
+            adicionales,
             replaceDuplicates,
           }),
         });
@@ -179,7 +191,7 @@ const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
         setSaving(false);
       }
     },
-    [preview, manualAssignments, discardedRepeated]
+    [preview, manualAssignments, discardedRepeated, markedAsAdicional]
   );
 
   // Confirm save — check for duplicates first
@@ -282,6 +294,14 @@ const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
                   return next;
                 });
               }}
+              markedAsAdicional={markedAsAdicional}
+              onToggleAdicional={(idx) => {
+                setMarkedAsAdicional((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(idx)) next.delete(idx); else next.add(idx);
+                  return next;
+                });
+              }}
             />
 
           <div className="flex justify-end gap-4">
@@ -295,7 +315,7 @@ const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
             </Button>
             <Button
               onClick={handleConfirmSave}
-              disabled={saving || (preview.matched.length + manualAssignments.size - discardedRepeated.size) === 0}
+              disabled={saving || (preview.matched.length + manualAssignments.size - discardedRepeated.size - markedAsAdicional.size) === 0}
               size="lg"
             >
               {saving ? (
@@ -306,7 +326,7 @@ const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
               ) : (
                 <>
                   <CheckCircle className="mr-2 h-4 w-4" />
-                  Confirmar y guardar ({preview.matched.length + manualAssignments.size - discardedRepeated.size} pedidos)
+                  Confirmar y guardar ({preview.matched.length + manualAssignments.size - discardedRepeated.size - markedAsAdicional.size} pedidos)
                 </>
               )}
             </Button>

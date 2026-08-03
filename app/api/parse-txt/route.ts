@@ -17,6 +17,7 @@ import type {
   DuplicateInfo,
   RepeatedOrderGroup,
   UploadConfig,
+  AdicionalRecord,
 } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
@@ -90,7 +91,28 @@ export async function POST(request: NextRequest) {
 
     // Separate matched vs unmatched
     const matched = matchResults.filter((r) => r.worker !== null);
-    const unmatched = matchResults.filter((r) => r.worker === null);
+    let unmatched = matchResults.filter((r) => r.worker === null);
+
+    // ── PRODUCCIÓN-specific routing: unmatched orders that say "adicional" ──
+    // Rule: if the order has isAdditional=true AND couldn't be matched to any
+    // registered worker → it's a real adicional (visitor, external person, etc.)
+    // Examples: "63. Visita / / Adicional / Oficina CAASA" (no DNI, not in worker list)
+    // Contrast: "60. Gery Castro/45835175/Adicional" → matched → stays as normal order
+    const isProduccion = /PRODUCC/i.test(typedGroup.name);
+    const adicionalesAgg = { ...parseResult.adicionales };
+    const adicionalesDetailed: AdicionalRecord[] = [...parseResult.adicionalesDetailed];
+
+    let reclassifiedToAdic = 0;
+    if (isProduccion) {
+      const unmatchedAdic = unmatched.filter((u) => u.parsedOrder.isAdditional);
+      unmatched = unmatched.filter((u) => !u.parsedOrder.isAdditional);
+      reclassifiedToAdic = unmatchedAdic.length;
+      for (const u of unmatchedAdic) {
+        const date = u.parsedOrder.date;
+        adicionalesAgg[date] = (adicionalesAgg[date] || 0) + 1;
+        adicionalesDetailed.push({ date, rawText: u.parsedOrder.rawText, count: 1 });
+      }
+    }
 
     // Check for duplicates (existing orders for same worker+date+group)
     const duplicates: DuplicateInfo[] = [];
@@ -155,7 +177,7 @@ export async function POST(request: NextRequest) {
     repeated.sort((a, b) => a.date.localeCompare(b.date) || a.workerName.localeCompare(b.workerName));
 
     // Build summary
-    const adicionalesTotal = Object.values(parseResult.adicionales).reduce(
+    const adicionalesTotal = Object.values(adicionalesAgg).reduce(
       (sum, n) => sum + n,
       0
     );
@@ -175,12 +197,13 @@ export async function POST(request: NextRequest) {
       matched,
       unmatched,
       newWorkers: trulyNewWorkers,
-      adicionales: parseResult.adicionales,
+      adicionales: adicionalesAgg,
+      adicionalesDetailed,
       errors: parseResult.errors,
       duplicates,
       repeated,
       summary: {
-        totalOrders: parseResult.orders.length,
+        totalOrders: parseResult.orders.length - reclassifiedToAdic,
         matchedCount: matched.length,
         unmatchedCount: unmatched.length,
         adicionalesTotal,
