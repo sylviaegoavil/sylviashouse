@@ -397,6 +397,10 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
   const effectiveMatchedCount = summary.matchedCount + assignedCount - discardedCount - markedAdicionalCount;
   const effectiveTotalCount = summary.totalOrders - discardedCount - markedAdicionalCount;
   const effectiveAdicionalesTotal = summary.adicionalesTotal + markedAdicionalCount;
+  // PRODUCCIÓN: matched orders with "adicional" in text, not yet marked — shown in review section
+  const pendingReviewCount = isProduccion
+    ? matched.filter((m, idx) => m.parsedOrder.isAdditional && m.worker !== null && !(markedAsAdicional?.has(idx))).length
+    : 0;
 
   const displayedMatched = reviewOnly
     ? matched.filter((m) => m.confidence < 1).sort((a, b) => a.confidence - b.confidence)
@@ -409,7 +413,7 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
 
   return (
     <div className="space-y-6">
-      {/* Summary cards */}
+      {/* Summary cards — all clickable, lead to their respective tab */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <Card>
           <CardHeader className="pb-2">
@@ -417,16 +421,19 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
             <CardTitle className="text-2xl">{effectiveTotalCount}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
+
+        <Card
+          className="cursor-pointer hover:bg-green-50/50 transition-colors"
+          onClick={() => { setActiveTab("matched"); setReviewOnly(false); }}
+        >
           <CardHeader className="pb-2">
             <CardDescription>Emparejados</CardDescription>
-            <CardTitle className="text-2xl text-green-600">
-              {effectiveMatchedCount}
-            </CardTitle>
+            <CardTitle className="text-2xl text-green-600">{effectiveMatchedCount}</CardTitle>
           </CardHeader>
         </Card>
+
         <Card
-          className={`${effectiveUnmatched > 0 ? "cursor-pointer hover:bg-amber-50/50" : ""}`}
+          className={`transition-colors ${effectiveUnmatched > 0 ? "cursor-pointer hover:bg-amber-50/50" : ""}`}
           onClick={effectiveUnmatched > 0 ? () => setActiveTab("unmatched") : undefined}
         >
           <CardHeader className="pb-2">
@@ -436,19 +443,30 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
             </CardTitle>
           </CardHeader>
         </Card>
+
         <Card
-          className={effectiveAdicionalesTotal > 0 ? "cursor-pointer hover:bg-blue-50/50" : ""}
-          onClick={effectiveAdicionalesTotal > 0 ? () => setActiveTab("adicionales") : undefined}
+          className={`transition-colors cursor-pointer ${
+            pendingReviewCount > 0
+              ? "border-amber-300 hover:bg-amber-50/50"
+              : effectiveAdicionalesTotal > 0
+              ? "hover:bg-blue-50/50"
+              : "hover:bg-muted/30"
+          }`}
+          onClick={() => setActiveTab("adicionales")}
         >
           <CardHeader className="pb-2">
             <CardDescription>Adicionales</CardDescription>
-            <CardTitle className="text-2xl text-blue-600">
-              {effectiveAdicionalesTotal}
-            </CardTitle>
+            <CardTitle className="text-2xl text-blue-600">{effectiveAdicionalesTotal}</CardTitle>
+            {pendingReviewCount > 0 && (
+              <p className="text-xs text-amber-600 font-medium mt-0.5">
+                ({pendingReviewCount} para revisar)
+              </p>
+            )}
           </CardHeader>
         </Card>
+
         <Card
-          className={summary.repeatedCount > 0 ? "border-orange-300 cursor-pointer hover:bg-orange-50/50" : ""}
+          className={`transition-colors ${summary.repeatedCount > 0 ? "border-orange-300 cursor-pointer hover:bg-orange-50/50" : ""}`}
           onClick={summary.repeatedCount > 0 ? () => setActiveTab("repeated") : undefined}
         >
           <CardHeader className="pb-2">
@@ -461,8 +479,9 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
             )}
           </CardHeader>
         </Card>
+
         <Card
-          className={`${needsReviewCount > 0 ? "border-yellow-300 cursor-pointer hover:bg-yellow-50/50" : ""}`}
+          className={`transition-colors ${needsReviewCount > 0 ? "border-yellow-300 cursor-pointer hover:bg-yellow-50/50" : ""}`}
           onClick={needsReviewCount > 0 ? goToReview : undefined}
         >
           <CardHeader className="pb-2">
