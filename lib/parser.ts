@@ -125,8 +125,10 @@ const ADICIONALES_AGREGAR =
   /AGREGAR\s+(?:UN\s+)?(?:COMO\s+)?ADICIONAL(?:ES)?/i;
 
 /** "01 adicional" pattern from APT CENAS */
+// (?<!\d) ensures we don't match digits that are part of a longer number (e.g. a DNI).
+// Without this, "60773950 adicional" would match "50 adicional" → quantity 50.
 const ADICIONALES_NUMERIC =
-  /(\d{1,2})\s+adicional/i;
+  /(?<!\d)(\d{1,2})\s+adicional/i;
 
 // ─── New worker detection ────────────────────────────────────────────────────
 
