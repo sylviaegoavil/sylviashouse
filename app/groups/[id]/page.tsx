@@ -31,10 +31,18 @@ export default function GroupDetailPage() {
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const [month, setMonth] = useState(defaultMonth);
 
-  // Delete modal state
+  // Delete month modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  // Delete day modal state
+  const [deleteDayTarget, setDeleteDayTarget] = useState<{ day: number; count: number; dateStr: string } | null>(null);
+  const [deletingDay, setDeletingDay] = useState(false);
+
+  // Delete single order modal state
+  const [deleteOrderTarget, setDeleteOrderTarget] = useState<{ id: string; workerName: string; dateStr: string } | null>(null);
+  const [deletingOrder, setDeletingOrder] = useState(false);
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -157,6 +165,45 @@ export default function GroupDetailPage() {
     setConfirmNoOrderDay(null);
   }
 
+  async function handleDeleteDay() {
+    if (!deleteDayTarget) return;
+    setDeletingDay(true);
+    try {
+      const res = await fetch("/api/orders/day", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId, date: deleteDayTarget.dateStr }),
+      });
+      if (!res.ok) {
+        toast.error((await res.json()).error ?? "Error al borrar pedidos del día");
+        return;
+      }
+      const { deleted } = await res.json();
+      toast.success(`Se eliminaron ${deleted} pedidos del día ${deleteDayTarget.day}`);
+      setDeleteDayTarget(null);
+      loadOrders();
+    } finally {
+      setDeletingDay(false);
+    }
+  }
+
+  async function handleDeleteOrder() {
+    if (!deleteOrderTarget) return;
+    setDeletingOrder(true);
+    try {
+      const res = await fetch(`/api/orders/${deleteOrderTarget.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        toast.error((await res.json()).error ?? "Error al eliminar pedido");
+        return;
+      }
+      toast.success(`Pedido de ${deleteOrderTarget.workerName} eliminado`);
+      setDeleteOrderTarget(null);
+      loadOrders();
+    } finally {
+      setDeletingOrder(false);
+    }
+  }
+
   async function handleDeleteMonth() {
     const [year, monthNum] = month.split("-").map(Number);
     setDeleting(true);
@@ -225,6 +272,9 @@ export default function GroupDetailPage() {
             noOrderDays={noOrderDays}
             canMarkNoOrder={canMarkNoOrder}
             onToggleNoOrderDay={handleToggleNoOrderDay}
+            isSuperAdmin={isSuperAdmin}
+            onDeleteDay={(day, count, dateStr) => setDeleteDayTarget({ day, count, dateStr })}
+            onDeleteOrder={(id, workerName, dateStr) => setDeleteOrderTarget({ id, workerName, dateStr })}
             extraHeaderActions={
               <div className="flex items-center gap-2">
                 <Button
@@ -312,6 +362,75 @@ export default function GroupDetailPage() {
           </div>
         );
       })()}
+
+      {/* Delete day modal */}
+      {deleteDayTarget && (() => {
+        const [year, monthNum] = month.split("-").map(Number);
+        const label = `${deleteDayTarget.day} de ${MONTHS_ES[monthNum]} ${year}`;
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-sm">
+              <CardHeader>
+                <CardTitle className="text-base text-red-700 flex items-center gap-2">
+                  <Trash2 className="h-4 w-4" />
+                  Borrar pedidos del día
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm">
+                  ¿Borrar todos los pedidos de <strong>{group?.name}</strong> del día <strong>{label}</strong>?
+                  Se eliminarán <strong>{deleteDayTarget.count} pedidos</strong>. Esta acción no se puede deshacer.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleDeleteDay}
+                    disabled={deletingDay}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {deletingDay ? "Borrando..." : "Borrar pedidos"}
+                  </Button>
+                  <Button variant="outline" onClick={() => setDeleteDayTarget(null)} disabled={deletingDay}>
+                    Cancelar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
+
+      {/* Delete single order modal */}
+      {deleteOrderTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-sm">
+            <CardHeader>
+              <CardTitle className="text-base text-red-700 flex items-center gap-2">
+                <Trash2 className="h-4 w-4" />
+                Eliminar pedido
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm">
+                ¿Eliminar el pedido de <strong>{deleteOrderTarget.workerName}</strong> del día{" "}
+                <strong>{parseInt(deleteOrderTarget.dateStr.split("-")[2], 10)}</strong>?
+                Esta acción no se puede deshacer.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleDeleteOrder}
+                  disabled={deletingOrder}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {deletingOrder ? "Eliminando..." : "Eliminar"}
+                </Button>
+                <Button variant="outline" onClick={() => setDeleteOrderTarget(null)} disabled={deletingOrder}>
+                  Cancelar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* No-order day confirmation modal */}
       {confirmNoOrderDay !== null && (() => {

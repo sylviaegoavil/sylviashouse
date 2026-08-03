@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import { Trash2 } from "lucide-react";
 import { MonthSelector } from "./MonthSelector";
 import type { Worker, Order, Group } from "@/lib/types";
 
@@ -21,6 +22,9 @@ interface AttendanceGridProps {
   noOrderDays?: Set<number>;       // day numbers (1-31) marked as no-order
   canMarkNoOrder?: boolean;        // show toggle buttons (admin only)
   onToggleNoOrderDay?: (day: number) => void;
+  isSuperAdmin?: boolean;
+  onDeleteDay?: (day: number, count: number, dateStr: string) => void;
+  onDeleteOrder?: (orderId: string, workerName: string, dateStr: string) => void;
 }
 
 const DAY_NAMES_SHORT = ["D", "L", "M", "Mi", "J", "V", "S"];
@@ -101,6 +105,9 @@ export function AttendanceGrid({
   noOrderDays,
   canMarkNoOrder = false,
   onToggleNoOrderDay,
+  isSuperAdmin = false,
+  onDeleteDay,
+  onDeleteOrder,
 }: AttendanceGridProps) {
   const [year, monthNum] = month.split("-").map(Number);
   const daysInMonth = new Date(year, monthNum, 0).getDate();
@@ -277,10 +284,11 @@ export function AttendanceGrid({
                 const dayTotal = dayTotals[i] + (adicPerDay[i] || 0);
                 const isMarked = noOrderDays?.has(d) ?? false;
                 const showToggle = canMarkNoOrder && dayTotal === 0;
+                const dateStr = `${year}-${String(monthNum).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
                 return (
                   <th
                     key={d}
-                    className={`px-1 py-1 text-center min-w-[32px] ${
+                    className={`group/daycol px-1 py-1 text-center min-w-[32px] ${
                       selectedDay === d ? "bg-blue-100 ring-1 ring-inset ring-blue-300" :
                       isWeekend ? "bg-amber-50" : ""
                     } ${isMarked && selectedDay !== d ? "bg-gray-50" : ""}`}
@@ -289,6 +297,15 @@ export function AttendanceGrid({
                       {DAY_NAMES_SHORT[dayOfWeek[i]]}
                     </div>
                     <div>{d}</div>
+                    {isSuperAdmin && dayTotal > 0 && (
+                      <button
+                        onClick={() => onDeleteDay?.(d, dayTotal, dateStr)}
+                        title={`Borrar todos los pedidos del día ${d} (${dayTotal})`}
+                        className="opacity-0 group-hover/daycol:opacity-100 transition-opacity text-red-400 hover:text-red-600 mt-0.5 block mx-auto"
+                      >
+                        <Trash2 className="h-2.5 w-2.5" />
+                      </button>
+                    )}
                     {showToggle && (
                       <button
                         onClick={() => onToggleNoOrderDay?.(d)}
@@ -511,25 +528,40 @@ export function AttendanceGrid({
                     <th className="text-left py-1.5 pr-4 font-medium">DNI</th>
                     <th className="text-left py-1.5 pr-4 font-medium">Fuente</th>
                     <th className="text-left py-1.5 font-medium">Notas</th>
+                    {isSuperAdmin && <th className="py-1.5 w-8" />}
                   </tr>
                 </thead>
                 <tbody>
-                  {dayDetailOrders.map((o) => (
-                    <tr key={o.id} className="border-b last:border-0">
-                      <td className="py-1.5 pr-4 font-medium">{o.workerName}</td>
-                      <td className="py-1.5 pr-4 font-mono text-xs">{o.docNumber}</td>
-                      <td className="py-1.5 pr-4">
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${
-                          o.source === "whatsapp"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}>
-                          {o.source === "whatsapp" ? "WhatsApp" : "Manual"}
-                        </span>
-                      </td>
-                      <td className="py-1.5 text-muted-foreground">{o.notes ?? ""}</td>
-                    </tr>
-                  ))}
+                  {dayDetailOrders.map((o) => {
+                    const dateStr = `${year}-${String(monthNum).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`;
+                    return (
+                      <tr key={o.id} className="border-b last:border-0 group/orderrow">
+                        <td className="py-1.5 pr-4 font-medium">{o.workerName}</td>
+                        <td className="py-1.5 pr-4 font-mono text-xs">{o.docNumber}</td>
+                        <td className="py-1.5 pr-4">
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            o.source === "whatsapp"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}>
+                            {o.source === "whatsapp" ? "WhatsApp" : "Manual"}
+                          </span>
+                        </td>
+                        <td className="py-1.5 text-muted-foreground">{o.notes ?? ""}</td>
+                        {isSuperAdmin && (
+                          <td className="py-1.5 pl-2">
+                            <button
+                              onClick={() => onDeleteOrder?.(o.id, o.workerName, dateStr)}
+                              title={`Eliminar pedido de ${o.workerName}`}
+                              className="opacity-0 group-hover/orderrow:opacity-100 transition-opacity text-red-400 hover:text-red-600"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
