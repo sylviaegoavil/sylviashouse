@@ -208,20 +208,33 @@ function AdiccionalesProduccionView({
   markedAsAdicional,
   matchedOrders,
   onRestoreOrder,
+  onMarkAsAdicional,
 }: {
   adicionalesDetailed: AdicionalRecord[];
   markedAsAdicional?: Set<number>;
   matchedOrders: MatchResult[];
   onRestoreOrder?: (idx: number) => void;
+  onMarkAsAdicional?: (idx: number) => void;
 }) {
+  // Orders with "adicional" in text that matched a worker and are NOT yet marked
+  const pendingReview = matchedOrders
+    .map((order, idx) => ({ order, idx }))
+    .filter(({ order, idx }) =>
+      order.parsedOrder.isAdditional &&
+      order.worker !== null &&
+      !(markedAsAdicional?.has(idx))
+    );
+
   const markedRows = markedAsAdicional
-    ? Array.from(markedAsAdicional).map((idx) => ({
-        idx,
-        order: matchedOrders[idx],
-      })).filter((r) => r.order?.worker)
+    ? Array.from(markedAsAdicional)
+        .map((idx) => ({ idx, order: matchedOrders[idx] }))
+        .filter((r) => r.order?.worker)
     : [];
 
-  const hasAny = adicionalesDetailed.length > 0 || markedRows.length > 0;
+  const hasAny =
+    adicionalesDetailed.length > 0 ||
+    markedRows.length > 0 ||
+    pendingReview.length > 0;
 
   if (!hasAny) {
     return (
@@ -233,32 +246,54 @@ function AdiccionalesProduccionView({
 
   return (
     <div className="space-y-6">
-      {/* Natural adicionales detected from chat */}
-      {adicionalesDetailed.length > 0 && (
+
+      {/* ── Section 1: Pedidos con "adicional" emparejados a un trabajador ── */}
+      {pendingReview.length > 0 && (
         <div>
-          <p className="text-sm font-semibold text-muted-foreground mb-2">
-            Detectados automáticamente ({adicionalesDetailed.length} registro{adicionalesDetailed.length !== 1 ? "s" : ""}, total {adicionalesDetailed.reduce((s, r) => s + r.count, 0)})
+          <div className="flex items-center gap-2 mb-2">
+            <p className="text-sm font-semibold text-amber-700">
+              Pedidos con &quot;adicional&quot; emparejados a un trabajador
+            </p>
+            <span className="bg-amber-100 text-amber-700 text-xs font-mono px-2 py-0.5 rounded-full">
+              {pendingReview.length} para revisar
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Cuentan como pedido del trabajador por defecto. Márcalos como adicional solo si corresponde.
           </p>
-          <div className="max-h-[350px] overflow-auto rounded border border-border">
+          <div className="rounded border border-amber-200 overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                <tr className="border-b bg-amber-50/60 text-xs text-muted-foreground">
                   <th className="py-2 px-3 text-left font-medium w-28">Fecha</th>
-                  <th className="py-2 px-3 text-left font-medium w-12">Cant.</th>
-                  <th className="py-2 px-3 text-left font-medium">Texto detectado</th>
+                  <th className="py-2 px-3 text-left font-medium">Trabajador</th>
+                  <th className="py-2 px-3 text-left font-medium w-28">DNI</th>
+                  <th className="py-2 px-3 text-left font-medium">Texto original</th>
+                  <th className="py-2 px-3 text-left font-medium w-40"></th>
                 </tr>
               </thead>
               <tbody>
-                {adicionalesDetailed.map((rec, i) => (
-                  <tr key={i} className="border-b last:border-0 hover:bg-muted/20">
-                    <td className="py-2 px-3 font-mono text-xs whitespace-nowrap">{rec.date}</td>
-                    <td className="py-2 px-3 text-center">
-                      <span className="bg-blue-100 text-blue-700 text-xs font-mono px-1.5 py-0.5 rounded">
-                        {rec.count}
-                      </span>
+                {pendingReview.map(({ order, idx }) => (
+                  <tr key={idx} className="border-b last:border-0 hover:bg-amber-50/30">
+                    <td className="py-2 px-3 font-mono text-xs whitespace-nowrap">
+                      {order.parsedOrder.date}
                     </td>
-                    <td className="py-2 px-3 text-muted-foreground text-xs break-words max-w-xs">
-                      {rec.rawText.slice(0, 150)}{rec.rawText.length > 150 ? "…" : ""}
+                    <td className="py-2 px-3 font-medium text-sm">
+                      {order.worker!.full_name}
+                    </td>
+                    <td className="py-2 px-3 font-mono text-xs text-muted-foreground">
+                      {order.worker!.doc_number}
+                    </td>
+                    <td className="py-2 px-3 text-xs text-muted-foreground max-w-[220px] truncate">
+                      {order.parsedOrder.rawText}
+                    </td>
+                    <td className="py-2 px-3">
+                      <button
+                        onClick={() => onMarkAsAdicional?.(idx)}
+                        className="text-xs px-2.5 py-1 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 whitespace-nowrap"
+                      >
+                        Marcar como adicional
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -268,7 +303,7 @@ function AdiccionalesProduccionView({
         </div>
       )}
 
-      {/* User-marked adicionales (from Matched tab toggle) */}
+      {/* ── Section 2: User-marked adicionales ── */}
       {markedRows.length > 0 && (
         <div>
           <p className="text-sm font-semibold text-muted-foreground mb-2">
@@ -300,6 +335,42 @@ function AdiccionalesProduccionView({
           </div>
         </div>
       )}
+
+      {/* ── Section 3: Auto-detected adicionales from chat ── */}
+      {adicionalesDetailed.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold text-muted-foreground mb-2">
+            Detectados automáticamente ({adicionalesDetailed.length} registro{adicionalesDetailed.length !== 1 ? "s" : ""}, total {adicionalesDetailed.reduce((s, r) => s + r.count, 0)})
+          </p>
+          <div className="max-h-[300px] overflow-auto rounded border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <th className="py-2 px-3 text-left font-medium w-28">Fecha</th>
+                  <th className="py-2 px-3 text-left font-medium w-12">Cant.</th>
+                  <th className="py-2 px-3 text-left font-medium">Texto detectado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adicionalesDetailed.map((rec, i) => (
+                  <tr key={i} className="border-b last:border-0 hover:bg-muted/20">
+                    <td className="py-2 px-3 font-mono text-xs whitespace-nowrap">{rec.date}</td>
+                    <td className="py-2 px-3 text-center">
+                      <span className="bg-blue-100 text-blue-700 text-xs font-mono px-1.5 py-0.5 rounded">
+                        {rec.count}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 text-muted-foreground text-xs break-words max-w-xs">
+                      {rec.rawText.slice(0, 150)}{rec.rawText.length > 150 ? "…" : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -707,6 +778,7 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
                   markedAsAdicional={markedAsAdicional}
                   matchedOrders={matched}
                   onRestoreOrder={onToggleAdicional}
+                  onMarkAsAdicional={onToggleAdicional}
                 />
               ) : (
                 Object.keys(adicionales).length === 0 ? (
