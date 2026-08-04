@@ -44,13 +44,11 @@ const IGNORE_PATTERNS: RegExp[] = [
   /añadió a ~/i,
   /Se añadió a/i,
   /salió del grupo/i,
-  /\*ENTRADAS\*/i,
-  /\*PLATOS DE FONDO\*/i,
-  // NOTE: REFRESCO and POSTRE are intentionally NOT here — they appear in
-  // legitimate order lines like "12. Juan Perez/73008708/refresco" and
-  // "16. Orlando Navarro/73008708/postre 🐒". isFoodItem() handles them
-  // correctly by stripping them from name extraction without ignoring the line.
-  /\*DIETA\*/i,
+  // NOTE: *ENTRADAS*, *PLATOS DE FONDO*, *DIETA* are intentionally NOT here.
+  // These WhatsApp-bold section headers come from Sylvia's messages, which go
+  // through the isSylvia=true path and never reach shouldIgnore(fullText).
+  // Adding them here would incorrectly drop worker orders like
+  // "23. Gery Castro/45835175/*Dieta*" where the food field uses WhatsApp bold.
   /^\s*Total\s+\d+\s+(almuerzos?|cenas?)/i,
   /^\s*\d+\s+(almuerzos?|cenas?)\s*$/i,
   /^\s*\+?\d+\s+gaseosas?\s*$/i,
@@ -771,7 +769,9 @@ function cleanOrderLine(line: string): string {
   // Remove "<Se editó este mensaje.>" but keep rest
   s = s.replace(/<Se editó este mensaje\.?>/gi, "");
 
-  // Remove leading asterisks
+  // Strip WhatsApp bold markers (*word*) → word, then remove any remaining
+  // leading/trailing asterisks (standalone * used as bullets or decoration).
+  s = s.replace(/\*([^*\n]+)\*/g, "$1");
   s = s.replace(/^\*+/, "").replace(/\*+$/, "");
 
   // Remove leading order number + separator
