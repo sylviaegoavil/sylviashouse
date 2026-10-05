@@ -1,5 +1,7 @@
 import { getAuthContext } from "@/lib/auth";
 import { createServerSupabaseClientSSR, createServiceRoleSupabaseClient } from "@/lib/supabase-server";
+import { consultarRuc } from "@/lib/services/rucLookup";
+import { consultarDni } from "@/lib/services/dniLookup";
 
 export async function GET(req: Request) {
   try {
@@ -10,11 +12,13 @@ export async function GET(req: Request) {
     }
 
     const { searchParams } = new URL(req.url);
-    const ruc = searchParams.get("ruc")?.trim() ?? "";
+    const doc = searchParams.get("ruc")?.trim() ?? "";
     const force = searchParams.get("force") === "true";
 
-    if (!ruc || ruc.length !== 11 || !/^\d{11}$/.test(ruc)) {
-      return Response.json({ error: "El RUC debe tener exactamente 11 dígitos numéricos" }, { status: 400 });
+    const isRuc = /^\d{11}$/.test(doc);
+    const isDni = /^\d{8}$/.test(doc);
+    if (!isRuc && !isDni) {
+      return Response.json({ error: "Ingresa un RUC (11 dígitos) o DNI (8 dígitos) válido" }, { status: 400 });
     }
 
     const supabase = await createServerSupabaseClientSSR();
@@ -24,7 +28,7 @@ export async function GET(req: Request) {
       const { data: cached } = await supabase
         .from("clients_cache")
         .select("ruc, business_name, address, attention, phone, email, reference")
-        .eq("ruc", ruc)
+        .eq("ruc", doc)
         .maybeSingle();
 
       if (cached) {
@@ -37,66 +41,49 @@ export async function GET(req: Request) {
       }
     }
 
-    // ── 2. Call APIS PERU ─────────────────────────────────────────────────
-    const token = process.env.APIS_PERU_TOKEN;
-    if (!token) {
-      return Response.json(
-        { error: "Token APIS_PERU_TOKEN no configurado en variables de entorno" },
-        { status: 500 }
-      );
+    // ── 2. Call external provider (APIs Peru, con fallback a Decolecta) ──
+    let razonSocial: string;
+    let nombreComercial: string | null = null;
+    let direccion = "";
+    let estado: string | null = null;
+    let condicion: string | null = null;
+
+    if (isRuc) {
+      const result = await consultarRuc(doc);
+      if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
+      razonSocial = result.razonSocial;
+      nombreComercial = result.nombreComercial;
+      direccion = result.direccion;
+      estado = result.estado;
+      condicion = result.condicion;
+    } else {
+      const result = await consultarDni(doc);
+      if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
+      razonSocial = result.fullName;
     }
-
-    let apiRes: Response;
-    try {
-      apiRes = await fetch(
-        `https://dniruc.apisperu.com/api/v1/ruc/${ruc}?token=${token}`,
-        { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) }
-      );
-    } catch {
-      return Response.json({ error: "Sin conexión con el servicio de consulta RUC" }, { status: 503 });
-    }
-
-    if (apiRes.status === 401) {
-      return Response.json({ error: "Token APIS_PERU vencido o inválido" }, { status: 401 });
-    }
-
-    const json = await apiRes.json().catch(() => null);
-
-    if (!apiRes.ok || !json) {
-      return Response.json({ error: "Error al consultar el RUC" }, { status: 502 });
-    }
-
-    if (json.success === false || !json.razonSocial) {
-      const msg = json.message ?? "RUC no encontrado en SUNAT";
-      return Response.json({ error: msg }, { status: 404 });
-    }
-
-    const parts = [json.direccion, json.distrito, json.provincia, json.departamento]
-      .filter(Boolean)
-      .join(", ");
 
     // ── 3. Save to cache using service role (bypasses RLS, no session needed) ─
     const serviceClient = createServiceRoleSupabaseClient();
     const { error: cacheError } = await serviceClient.from("clients_cache").upsert(
       {
-        ruc:           json.ruc,
-        business_name: json.razonSocial,
-        address:       parts || null,
+        ruc:           doc,
+        business_name: razonSocial,
+        address:       direccion || null,
         updated_at:    new Date().toISOString(),
       },
       { onConflict: "ruc" }
     );
     if (cacheError) {
-      console.error("[clients_cache] upsert failed after RUC lookup:", cacheError.message);
+      console.error("[clients_cache] upsert failed after document lookup:", cacheError.message);
     }
 
     return Response.json({
-      ruc: json.ruc,
-      razonSocial: json.razonSocial,
-      nombreComercial: json.nombreComercial ?? null,
-      direccion: parts,
-      estado: json.estado ?? null,
-      condicion: json.condicion ?? null,
+      ruc: doc,
+      razonSocial,
+      nombreComercial,
+      direccion,
+      estado,
+      condicion,
       fromCache: false,
     });
   } catch (err) {

@@ -237,20 +237,22 @@ export default function CotizacionGeneradorPage() {
     );
   }
 
-  // ── RUC lookup ───────────────────────────────────────────────────────────
+  // ── RUC / DNI lookup ─────────────────────────────────────────────────────
   async function lookupRuc(force = false) {
-    const ruc = clientRuc.trim();
-    if (!/^\d{11}$/.test(ruc)) { toast.error("El RUC debe tener 11 dígitos"); return; }
+    const doc = clientRuc.trim();
+    const isRuc = /^\d{11}$/.test(doc);
+    const isDni = /^\d{8}$/.test(doc);
+    if (!isRuc && !isDni) { toast.error("Ingresa un RUC (11 dígitos) o DNI (8 dígitos) válido"); return; }
     setRucLoading(true);
     try {
-      const url = `/api/cotizaciones/consultar-ruc?ruc=${ruc}${force ? "&force=true" : ""}`;
+      const url = `/api/cotizaciones/consultar-ruc?ruc=${doc}${force ? "&force=true" : ""}`;
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) { toast.error(data.error); return; }
       setClientBusinessName(data.razonSocial ?? "");
       setClientAddress(data.direccion ?? "");
       setRucFromCache(!!data.fromCache);
-      toast.success(data.fromCache ? "Cliente cargado desde caché" : "RUC consultado en SUNAT");
+      toast.success(data.fromCache ? "Cliente cargado desde caché" : isRuc ? "RUC consultado en SUNAT" : "DNI consultado en RENIEC");
     } finally {
       setRucLoading(false);
     }
@@ -529,17 +531,17 @@ export default function CotizacionGeneradorPage() {
             <CardHeader><CardTitle className="text-base">Datos del cliente</CardTitle></CardHeader>
             <CardContent className="space-y-3">
 
-              {/* RUC + autocomplete */}
+              {/* RUC / DNI + autocomplete */}
               <div className="flex gap-2">
                 <div className="flex-1 flex flex-col gap-1">
-                  <label className="text-xs font-medium">RUC</label>
+                  <label className="text-xs font-medium">RUC / DNI</label>
                   <div className="relative" ref={rucDropRef}>
                     <input
                       value={clientRuc}
                       onChange={(e) => onRucChange(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && lookupRuc()}
                       onFocus={() => rucSuggestions.length > 0 && setShowRucDrop(true)}
-                      placeholder="20100047218" maxLength={11}
+                      placeholder="20100047218 o 12345678" maxLength={11}
                       className="w-full rounded-md border border-input px-3 py-2 text-sm font-mono"
                     />
                     {showRucDrop && rucSuggestions.length > 0 && (
@@ -564,7 +566,7 @@ export default function CotizacionGeneradorPage() {
                   <Button size="sm" variant="outline" onClick={() => lookupRuc()} disabled={rucLoading}
                     className="h-[38px]">
                     {rucLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    <span className="ml-1.5">Consultar RUC</span>
+                    <span className="ml-1.5">{clientRuc.trim().length === 8 ? "Consultar DNI" : "Consultar RUC"}</span>
                   </Button>
                   {rucFromCache && (
                     <Button size="sm" variant="ghost" onClick={() => lookupRuc(true)} disabled={rucLoading}
@@ -578,15 +580,15 @@ export default function CotizacionGeneradorPage() {
                 <p className="text-xs text-green-700 -mt-1">✓ datos cargados desde caché</p>
               )}
 
-              {/* Razón social + autocomplete */}
+              {/* Razón social / Nombre completo + autocomplete */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium">Razón social *</label>
+                <label className="text-xs font-medium">Razón social / Nombre completo *</label>
                 <div className="relative" ref={nameDropRef}>
                   <input
                     value={clientBusinessName}
                     onChange={(e) => onNameChange(e.target.value)}
                     onFocus={() => nameSuggestions.length > 0 && setShowNameDrop(true)}
-                    placeholder="EMPRESA SAC"
+                    placeholder="EMPRESA SAC o NOMBRE APELLIDO"
                     className="w-full rounded-md border border-input px-3 py-2 text-sm"
                   />
                   {showNameDrop && nameSuggestions.length > 0 && (
@@ -909,7 +911,7 @@ function QuotePreview(p: PreviewProps) {
               <span className="font-semibold">Señores: </span>{p.clientBusinessName || <span className="text-gray-400">—</span>}
             </td>
             <td className="border border-gray-200 px-2 py-1.5">
-              <span className="font-semibold">RUC: </span>{p.clientRuc || "—"}
+              <span className="font-semibold">{p.clientRuc.length === 8 ? "DNI" : "RUC"}: </span>{p.clientRuc || "—"}
             </td>
             <td className="border border-gray-200 px-2 py-1.5">
               <span className="font-semibold">Atención: </span>{p.clientAttention || "—"}

@@ -37,6 +37,7 @@ import {
   UserCheck,
   UserX,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import type { Group, Worker } from "@/lib/types";
 import { useAuth } from "@/components/AuthProvider";
@@ -63,6 +64,7 @@ export default function WorkersPage() {
     doc_number: "",
     doc_type: "DNI" as "DNI" | "CE",
   });
+  const [dniLookupLoading, setDniLookupLoading] = useState(false);
 
   // Load groups
   useEffect(() => {
@@ -119,6 +121,30 @@ export default function WorkersPage() {
       doc_type: worker.doc_type,
     });
     setDialogOpen(true);
+  };
+
+  // Look up full name by DNI
+  const lookupDni = async () => {
+    const dni = formData.doc_number.trim();
+    if (!/^\d{8}$/.test(dni)) {
+      toast.error("El DNI debe tener 8 dígitos");
+      return;
+    }
+    setDniLookupLoading(true);
+    try {
+      const res = await fetch(`/api/workers/consultar-dni?dni=${dni}`);
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Error al consultar DNI");
+        return;
+      }
+      setFormData((prev) => ({ ...prev, full_name: (data.fullName ?? "").toUpperCase() }));
+      toast.success("Nombre completado automáticamente");
+    } catch {
+      toast.error("Error de conexión al consultar DNI");
+    } finally {
+      setDniLookupLoading(false);
+    }
   };
 
   // Save worker
@@ -430,15 +456,35 @@ export default function WorkersPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Numero de documento</Label>
-                <Input
-                  className="mt-1"
-                  value={formData.doc_number}
-                  onChange={(e) =>
-                    setFormData({ ...formData, doc_number: e.target.value })
-                  }
-                  placeholder="12345678"
-                  maxLength={9}
-                />
+                <div className="mt-1 flex gap-1">
+                  <Input
+                    value={formData.doc_number}
+                    onChange={(e) =>
+                      setFormData({ ...formData, doc_number: e.target.value })
+                    }
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && formData.doc_type === "DNI" && lookupDni()
+                    }
+                    placeholder="12345678"
+                    maxLength={9}
+                  />
+                  {formData.doc_type === "DNI" && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      disabled={!/^\d{8}$/.test(formData.doc_number) || dniLookupLoading}
+                      onClick={lookupDni}
+                    >
+                      {dniLookupLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Buscar"
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
               <div>
                 <Label htmlFor="doc-type">Tipo de documento</Label>

@@ -330,7 +330,7 @@ export function QuotePDFDocument(props: QuotePDFProps) {
               <Text style={s.cValue}>{clientBusinessName}</Text>
             </View>
             <View style={s.cCell}>
-              <Text style={s.label}>RUC: </Text>
+              <Text style={s.label}>{clientRuc.length === 8 ? "DNI" : "RUC"}: </Text>
               <Text style={s.cValue}>{clientRuc}</Text>
             </View>
             <View style={s.cCellLast}>
