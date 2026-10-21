@@ -47,10 +47,10 @@ function buildTooltipText(cellOrders: Order[]): string {
     );
   }
   for (const o of manualSpecial) {
-    const label = o.special_label ?? "Pedido especial";
+    const label = o.special_label?.trim() ? ` — ${o.special_label.trim()}` : "";
     const price = `S/${o.special_price!.toFixed(2)}`;
     const note = o.notes ? ` — ${o.notes}` : "";
-    lines.push(`- Especial: ${label} ${price}${note}`);
+    lines.push(`- Especial ${price}${label}${note}`);
   }
   return lines.join("\n");
 }

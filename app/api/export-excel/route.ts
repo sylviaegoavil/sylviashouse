@@ -10,6 +10,7 @@ import { NextRequest } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { generateExcelAPT, generateExcelProduccion, generateExcelPatio, ExcelInput, WorkerOrder, ManualProductEntry, SpecialOrderSummary } from "@/lib/excel";
 import { DEFAULT_PRICES } from "@/lib/prices";
+import { specialRowLabel } from "@/lib/special-label";
 
 const MONTH_NAMES: Record<number, string> = {
   1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL",
@@ -153,8 +154,9 @@ export async function POST(request: NextRequest) {
       if (o.is_additional || !o.worker_id || o.special_price == null) continue;
       const group = relevantGroups.find((g) => g.id === o.group_id);
       if (!group) continue;
-      const label = o.special_label?.trim() || "Pedido especial";
-      const mapKey = `${group.name}\x00${label}\x00${o.special_price}`;
+      // Grouped by group type only (special_label is just a web note); same price → one row
+      const label = specialRowLabel(group.name);
+      const mapKey = `${label}\x00${o.special_price}`;
       if (!_specialMap.has(mapKey)) {
         _specialMap.set(mapKey, { groupName: group.name, label, price: o.special_price, dailyQty: {} });
       }

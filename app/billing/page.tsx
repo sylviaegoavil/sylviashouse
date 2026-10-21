@@ -5,6 +5,7 @@ import { DollarSign, TrendingUp } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import { DEFAULT_PRICES } from "@/lib/prices";
+import { specialRowLabel } from "@/lib/special-label";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_MONTH = new Date().getMonth() + 1;
@@ -102,12 +103,13 @@ export default function BillingPage() {
         ordersByGroup[o.group_id] = (ordersByGroup[o.group_id] || 0) + 1;
       }
 
-      // Special orders grouped by group_id → label+price
+      // Special orders grouped by group_id → group-type row + price (special_label is ignored)
+      const groupNameById: Record<string, string> = Object.fromEntries((groups || []).map((g) => [g.id, g.name]));
       const specialByGroup: Record<string, Map<string, { label: string; price: number; qty: number }>> = {};
       for (const o of orders) {
         if (o.is_additional || o.special_price == null) continue;
         if (!specialByGroup[o.group_id]) specialByGroup[o.group_id] = new Map();
-        const label = o.special_label?.trim() || "Pedido especial";
+        const label = specialRowLabel(groupNameById[o.group_id]);
         const key = `${label}\x00${o.special_price}`;
         const existing = specialByGroup[o.group_id].get(key);
         if (existing) { existing.qty++; }

@@ -207,7 +207,7 @@ export default function ManualOrdersPage() {
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-purple-900">Etiqueta (opcional)</label>
                   <input
-                    placeholder="Ej: Almuerzo ejecutivo"
+                    placeholder="Nota; se ve al pasar el mouse en Pedidos"
                     value={specialLabel}
                     onChange={(e) => setSpecialLabel(e.target.value)}
                     className="rounded-md border border-purple-300 bg-white px-3 py-2 text-sm"
