@@ -35,6 +35,15 @@ export default function GroupDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<"txt" | "all">("txt");
+  const [deletePreview, setDeletePreview] = useState<{
+    txtOrders: number;
+    txtAdicionales: number;
+    manualOrders: number;
+    manualAdicionales: number;
+    manualProducts: number;
+  } | null>(null);
+  const [deletePreviewLoading, setDeletePreviewLoading] = useState(false);
 
   // Delete day modal state
   const [deleteDayTarget, setDeleteDayTarget] = useState<{ day: number; count: number; dateStr: string } | null>(null);
@@ -204,6 +213,30 @@ export default function GroupDetailPage() {
     }
   }
 
+  async function openDeleteModal() {
+    const [year, monthNum] = month.split("-").map(Number);
+    setShowDeleteModal(true);
+    setDeleteConfirmText("");
+    setDeleteMode("txt");
+    setDeletePreview(null);
+    setDeletePreviewLoading(true);
+    try {
+      const res = await fetch(`/api/orders/bulk?groupId=${groupId}&year=${year}&month=${monthNum}`);
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Error al calcular los registros a borrar");
+        setShowDeleteModal(false);
+        return;
+      }
+      setDeletePreview(data);
+    } catch {
+      toast.error("Error de conexión al calcular los registros a borrar");
+      setShowDeleteModal(false);
+    } finally {
+      setDeletePreviewLoading(false);
+    }
+  }
+
   async function handleDeleteMonth() {
     const [year, monthNum] = month.split("-").map(Number);
     setDeleting(true);
@@ -211,14 +244,18 @@ export default function GroupDetailPage() {
       const res = await fetch("/api/orders/bulk", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId, year, month: monthNum }),
+        body: JSON.stringify({ groupId, year, month: monthNum, mode: deleteMode }),
       });
       if (!res.ok) {
         toast.error((await res.json()).error ?? "Error al borrar pedidos");
         return;
       }
-      const { deleted } = await res.json();
-      toast.success(`Se eliminaron ${deleted} pedidos de ${group?.name} — ${MONTHS_ES[monthNum]} ${year}`);
+      const { deletedOrders, deletedManualProducts } = await res.json();
+      toast.success(
+        deleteMode === "txt"
+          ? `Se eliminaron ${deletedOrders} registros del TXT de ${group?.name} — ${MONTHS_ES[monthNum]} ${year}`
+          : `Se eliminaron ${deletedOrders} pedidos y ${deletedManualProducts} productos manuales de ${group?.name} — ${MONTHS_ES[monthNum]} ${year}`
+      );
       setShowDeleteModal(false);
       setDeleteConfirmText("");
       loadOrders();
@@ -296,7 +333,7 @@ export default function GroupDetailPage() {
                     size="sm"
                     variant="outline"
                     className="text-red-600 border-red-200 hover:bg-red-50 h-8"
-                    onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(""); }}
+                    onClick={openDeleteModal}
                   >
                     <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                     Borrar mes
@@ -323,12 +360,63 @@ export default function GroupDetailPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm">
-                  ¿Estás seguro de borrar <strong>TODOS</strong> los pedidos de{" "}
-                  <strong>{group.name}</strong> del mes <strong>{label}</strong>?
+                  <strong>{group.name}</strong> — <strong>{label}</strong>
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Se eliminarán <strong>{orders.length} pedidos</strong>. Esta acción no se puede deshacer.
-                </p>
+                {deletePreviewLoading || !deletePreview ? (
+                  <p className="text-sm text-muted-foreground">Calculando registros…</p>
+                ) : (() => {
+                  const p = deletePreview;
+                  const txtTotal = p.txtOrders + p.txtAdicionales;
+                  const allOrders = txtTotal + p.manualOrders + p.manualAdicionales;
+                  return (
+                    <>
+                      <div className="space-y-2">
+                        <label className={`flex gap-2 rounded-md border p-3 text-sm cursor-pointer ${deleteMode === "txt" ? "border-red-300 bg-red-50/50" : "border-input"}`}>
+                          <input
+                            type="radio"
+                            name="deleteMode"
+                            checked={deleteMode === "txt"}
+                            onChange={() => setDeleteMode("txt")}
+                            className="mt-1"
+                          />
+                          <span>
+                            <strong>Borrar solo lo del TXT (WhatsApp)</strong>
+                            <span className="block text-xs text-muted-foreground">
+                              Pedidos y adicionales que vinieron del TXT. Conserva lo ingresado a mano.
+                            </span>
+                          </span>
+                        </label>
+                        <label className={`flex gap-2 rounded-md border p-3 text-sm cursor-pointer ${deleteMode === "all" ? "border-red-300 bg-red-50/50" : "border-input"}`}>
+                          <input
+                            type="radio"
+                            name="deleteMode"
+                            checked={deleteMode === "all"}
+                            onChange={() => setDeleteMode("all")}
+                            className="mt-1"
+                          />
+                          <span>
+                            <strong>Borrar todo el mes</strong>
+                            <span className="block text-xs text-muted-foreground">
+                              Pedidos TXT, pedidos y adicionales manuales y productos manuales.
+                            </span>
+                          </span>
+                        </label>
+                      </div>
+                      {deleteMode === "txt" ? (
+                        <p className="text-sm text-muted-foreground">
+                          Se borrarán <strong>{txtTotal} registros del TXT</strong> ({p.txtOrders} pedidos + {p.txtAdicionales} adicionales).
+                          Se conservarán: {p.manualOrders} pedidos manuales, {p.manualAdicionales} adicionales manuales y los productos manuales ({p.manualProducts} registros).
+                        </p>
+                      ) : (
+                        <p className="text-sm text-red-700">
+                          Se borrarán <strong>{allOrders} pedidos</strong> ({txtTotal} del TXT + {p.manualOrders + p.manualAdicionales} manuales)
+                          y <strong>{p.manualProducts} registros de productos manuales</strong>. No se conserva nada del mes.
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground">Esta acción no se puede deshacer.</p>
+                    </>
+                  );
+                })()}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">
                     Escribe <span className="font-mono font-bold text-red-600">BORRAR</span> para confirmar
@@ -344,10 +432,10 @@ export default function GroupDetailPage() {
                 <div className="flex gap-2 pt-1">
                   <Button
                     onClick={handleDeleteMonth}
-                    disabled={deleteConfirmText !== "BORRAR" || deleting}
+                    disabled={deleteConfirmText !== "BORRAR" || deleting || !deletePreview}
                     className="bg-red-600 hover:bg-red-700 text-white"
                   >
-                    {deleting ? "Borrando..." : "Borrar pedidos"}
+                    {deleting ? "Borrando..." : deleteMode === "txt" ? "Borrar lo del TXT" : "Borrar todo el mes"}
                   </Button>
                   <Button
                     variant="outline"
