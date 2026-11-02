@@ -129,11 +129,16 @@ export function AttendanceGrid({
 
   // Filter by search query
   const activeWorkers = useMemo(() => {
-    if (!search) return workersWithOrders;
-    const q = search.toLowerCase();
-    return workersWithOrders.filter(
-      (w) => w.full_name.toLowerCase().includes(q) || w.doc_number.includes(q)
-    );
+    // Comma-separated terms are OR-ed; empty terms ("CAMAYO,") are ignored
+    const terms = search
+      .split(",")
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+    if (terms.length === 0) return workersWithOrders;
+    return workersWithOrders.filter((w) => {
+      const name = w.full_name.toLowerCase();
+      return terms.some((q) => name.includes(q) || w.doc_number.includes(q));
+    });
   }, [workersWithOrders, search]);
 
   // Orders for selected day (for detail panel)
