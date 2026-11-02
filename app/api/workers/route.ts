@@ -8,8 +8,10 @@
  */
 
 import { NextRequest } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from "@/lib/supabase-server";
 import { getAuthContext } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
+import { deleteIfNoHistory } from "@/lib/worker-protection";
 
 export async function GET(request: NextRequest) {
   try {
@@ -88,8 +90,18 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       if (error.code === "23505") {
+        const { data: existing } = await supabase
+          .from("workers")
+          .select("is_active")
+          .eq("group_id", group_id)
+          .eq("doc_number", doc_number)
+          .maybeSingle();
         return Response.json(
-          { error: "Ya existe un trabajador con ese DNI en este grupo" },
+          {
+            error: existing && !existing.is_active
+              ? "Ya existe un trabajador con ese DNI en este grupo, pero está desactivado: actívalo desde la lista (filtro Desactivados)"
+              : "Ya existe un trabajador con ese DNI en este grupo",
+          },
           { status: 409 }
         );
       }
@@ -118,20 +130,40 @@ export async function DELETE(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id");
   if (!id) return Response.json({ error: "Falta id" }, { status: 400 });
 
-  const supabase = createServerSupabaseClient();
+  const supabase = createServiceRoleSupabaseClient();
 
-  const { count } = await supabase
-    .from("orders")
-    .select("id", { count: "exact", head: true })
-    .eq("worker_id", id);
+  try {
+    const { data: worker, error: readErr } = await supabase
+      .from("workers")
+      .select("id, full_name, doc_number, group_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (readErr) return Response.json({ error: readErr.message }, { status: 500 });
+    if (!worker) return Response.json({ error: "Trabajador no encontrado" }, { status: 404 });
 
-  if (count && count > 0) {
-    return Response.json({ error: "Tiene pedidos", orderCount: count }, { status: 409 });
+    // History is judged per DNI across ALL groups (orders.worker_id cascades on delete).
+    const { deleted, skipped } = await deleteIfNoHistory(supabase, [worker]);
+    if (skipped.length > 0) {
+      return Response.json(
+        { error: "Tiene pedidos", orderCount: skipped[0].orderCount },
+        { status: 409 }
+      );
+    }
+
+    await logAudit("worker_delete", "workers", worker.id, {
+      fullName: worker.full_name,
+      docNumber: worker.doc_number,
+      groupId: worker.group_id,
+      bulk: false,
+      deletedBy: ctx.profile.email,
+    });
+    return Response.json({ deleted: deleted.length === 1 });
+  } catch (err) {
+    return Response.json(
+      { error: err instanceof Error ? err.message : "Error al eliminar" },
+      { status: 500 }
+    );
   }
-
-  const { error } = await supabase.from("workers").delete().eq("id", id);
-  if (error) return Response.json({ error: error.message }, { status: 500 });
-  return Response.json({ deleted: true });
 }
 
 export async function PUT(request: NextRequest) {

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Save, X } from "lucide-react";
+import { Plus, Pencil, Save, X, Trash2 } from "lucide-react";
 
 interface UserRow {
   id: string;
@@ -44,6 +44,8 @@ export default function UsersAdminPage() {
   const [newPassword, setNewPassword] = useState("");
   const [newClientIds, setNewClientIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!loading && profile?.role !== "super_admin") router.replace("/dashboard");
@@ -109,6 +111,25 @@ export default function UsersAdminPage() {
     });
     if (res.ok) { toast.success(user.is_active ? "Desactivado" : "Activado"); loadData(); }
     else toast.error("Error al actualizar");
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: deleteTarget.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(data.error ?? "Error al eliminar"); return; }
+      toast.success(`Usuario ${deleteTarget.email} eliminado`);
+      setDeleteTarget(null);
+      loadData();
+    } finally {
+      setDeleting(false);
+    }
   }
 
   if (loading || fetching) return <div className="p-8 text-center text-muted-foreground">Cargando...</div>;
@@ -253,6 +274,13 @@ export default function UsersAdminPage() {
                         onClick={() => toggleActive(u)}>
                         {u.is_active ? "Desactivar" : "Activar"}
                       </Button>
+                      {u.id !== profile?.id && (
+                        <Button size="sm" variant="ghost" title="Eliminar usuario"
+                          className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setDeleteTarget(u)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -261,6 +289,28 @@ export default function UsersAdminPage() {
           )}
         </CardContent>
       </Card>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg border shadow-lg w-full max-w-sm p-6 space-y-4">
+            <h2 className="font-semibold text-base flex items-center gap-2 text-red-700">
+              <Trash2 className="h-4 w-4" /> Eliminar usuario
+            </h2>
+            <p className="text-sm">
+              ¿Eliminar al usuario <strong>{deleteTarget.full_name}</strong> ({deleteTarget.email})?
+              Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+                Cancelar
+              </Button>
+              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={confirmDelete} disabled={deleting}>
+                {deleting ? "Eliminando..." : "Eliminar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

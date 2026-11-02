@@ -61,12 +61,13 @@ export async function POST(request: NextRequest) {
     const relevantGroups = allGroups.filter((g) => groupNames.includes(g.name));
     const groupIds = relevantGroups.map((g) => g.id);
 
-    // Fetch workers for these groups
+    // Fetch workers for these groups. Deactivated workers are included on purpose: they
+    // must keep appearing in Excel exports of months where they have orders (buildDetailSheet
+    // only lists workers with at least one order in the month).
     const { data: allWorkers } = await supabase
       .from("workers")
       .select("id, group_id, full_name, doc_number")
       .in("group_id", groupIds)
-      .eq("is_active", true)
       .order("full_name");
 
     // Fetch orders for this month (paginated — all groups can exceed 1000 rows/month)

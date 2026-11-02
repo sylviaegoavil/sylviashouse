@@ -53,6 +53,7 @@ export default function WorkersPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"list" | "inactive">("list");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   // Delete modal: worker + optional orderCount (set when API returns 409)
   const [deleteModal, setDeleteModal] = useState<{ worker: Worker; orderCount?: number } | null>(null);
@@ -102,6 +103,10 @@ export default function WorkersPage() {
   useEffect(() => {
     loadWorkers();
   }, [loadWorkers]);
+
+  const visibleWorkers = workers.filter((w) =>
+    statusFilter === "all" ? true : statusFilter === "active" ? w.is_active : !w.is_active
+  );
 
   // Open add dialog
   const handleAdd = () => {
@@ -224,14 +229,25 @@ export default function WorkersPage() {
   // Toggle active
   const handleToggleActive = async (worker: Worker) => {
     try {
-      const response = await fetch("/api/workers", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: worker.id,
-          is_active: !worker.is_active,
-        }),
-      });
+      // super_admin goes through the guarded, audited endpoint; other roles keep the
+      // previous behaviour (unchanged permissions).
+      const response = isSuperAdmin
+        ? await fetch("/api/workers/bulk", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: worker.is_active ? "deactivate" : "activate",
+              ids: [worker.id],
+            }),
+          })
+        : await fetch("/api/workers", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: worker.id,
+              is_active: !worker.is_active,
+            }),
+          });
       if (response.ok) {
         toast.success(
           worker.is_active
@@ -239,6 +255,9 @@ export default function WorkersPage() {
             : "Trabajador activado"
         );
         loadWorkers();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast.error(data.error ?? "Error al cambiar estado");
       }
     } catch {
       toast.error("Error al cambiar estado");
@@ -313,6 +332,16 @@ export default function WorkersPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
+              className="h-9 rounded-lg border border-input bg-transparent px-3 text-sm"
+              aria-label="Estado"
+            >
+              <option value="all">Todos</option>
+              <option value="active">Activos</option>
+              <option value="inactive">Desactivados</option>
+            </select>
           </div>
         </CardContent>
       </Card>
@@ -321,7 +350,7 @@ export default function WorkersPage() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {workers.length} trabajador{workers.length !== 1 ? "es" : ""}
+            {visibleWorkers.length} trabajador{visibleWorkers.length !== 1 ? "es" : ""}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -338,7 +367,7 @@ export default function WorkersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {workers.length === 0 && (
+                {visibleWorkers.length === 0 && (
                   <TableRow>
                     <TableCell
                       colSpan={6}
@@ -350,7 +379,7 @@ export default function WorkersPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {workers.map((w) => (
+                {visibleWorkers.map((w) => (
                   <TableRow
                     key={w.id}
                     className={!w.is_active ? "opacity-50" : ""}
@@ -379,17 +408,26 @@ export default function WorkersPage() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleActive(w)}
-                        >
-                          {w.is_active ? (
+                        {w.is_active ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Desactivar"
+                            onClick={() => handleToggleActive(w)}
+                          >
                             <UserX className="h-4 w-4" />
-                          ) : (
-                            <UserCheck className="h-4 w-4" />
-                          )}
-                        </Button>
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-green-700 border-green-300 hover:bg-green-50"
+                            onClick={() => handleToggleActive(w)}
+                          >
+                            <UserCheck className="h-4 w-4 mr-1" />
+                            Activar
+                          </Button>
+                        )}
                         {isSuperAdmin && (
                           <Button
                             variant="ghost"

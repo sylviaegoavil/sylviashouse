@@ -15,6 +15,7 @@ export interface WorkerActivityRow {
   full_name: string;
   doc_number: string;
   group_id: string;
+  is_active: boolean;
 }
 
 export interface WorkerLastOrder {
@@ -48,19 +49,25 @@ export async function fetchWorkerLastOrders(
   return map;
 }
 
-/** Active workers of the given groups, paginated with a stable order. */
+/**
+ * Workers of the given groups, paginated with a stable order.
+ * Active only by default; includeInactive also returns deactivated rows (used to judge
+ * a DNI's history across all of its worker rows).
+ */
 export async function fetchActiveWorkers(
   supabase: BrowserClient,
-  groupIds: string[]
+  groupIds: string[],
+  includeInactive = false
 ): Promise<WorkerActivityRow[]> {
   const all: WorkerActivityRow[] = [];
   let from = 0;
   while (true) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("workers")
-      .select("id, full_name, doc_number, group_id")
-      .eq("is_active", true)
-      .in("group_id", groupIds)
+      .select("id, full_name, doc_number, group_id, is_active")
+      .in("group_id", groupIds);
+    if (!includeInactive) query = query.eq("is_active", true);
+    const { data, error } = await query
       .order("full_name", { ascending: true })
       .order("id", { ascending: true })
       .range(from, from + PAGE - 1);
