@@ -13,6 +13,12 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import { useAuth } from "@/components/AuthProvider";
+import {
+  fetchWorkerLastOrders,
+  fetchActiveWorkers,
+  cutoffDateFor,
+  formatOrderDate,
+} from "@/lib/worker-activity";
 
 const MONTHS_ES = [
   "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -68,6 +74,7 @@ async function fetchAllOrderPages(
       .in("group_id", groupIds)
       .gte("order_date", gte)
       .lte("order_date", lte)
+      .order("id", { ascending: true }) // stable order so pages don't skip/repeat rows
       .range(from, from + PAGE - 1);
     if (data) all.push(...(data as unknown as OrderRow[]));
     if (!data || data.length < PAGE) break;
@@ -93,6 +100,7 @@ export default function DashboardPage() {
   const [lastOrderMap, setLastOrderMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingInactive, setLoadingInactive] = useState(false);
+  const [inactiveError, setInactiveError] = useState<string | null>(null);
   // groupId → Set<"YYYY-MM-DD"> of no-order days for selected month
   const [noOrderDaysByGroup, setNoOrderDaysByGroup] = useState<Map<string, Set<string>>>(new Map());
   // groupId → { productName → totalQty }
@@ -137,8 +145,7 @@ export default function DashboardPage() {
       const [currOrders, prevOrdersData, workersRes, nodRes, mpRes] = await Promise.all([
         fetchAllOrderPages(supabase, "group_id, order_date", groupIds, startDate, endDate),
         fetchAllOrderPages(supabase, "group_id, order_date", groupIds, prevStartDate, prevEndDate),
-        supabase.from("workers").select("id, full_name, doc_number, group_id")
-          .eq("is_active", true).in("group_id", groupIds).order("full_name"),
+        fetchActiveWorkers(supabase, groupIds),
         supabase.from("no_order_days")
           .select("group_id, no_order_date")
           .in("group_id", groupIds)
@@ -154,7 +161,7 @@ export default function DashboardPage() {
       if (cancelled) return;
       setOrders(currOrders);
       setPrevOrders(prevOrdersData);
-      setWorkers(workersRes.data ?? []);
+      setWorkers(workersRes);
 
       // Build per-group map of no-order date strings
       const nodMap = new Map<string, Set<string>>();
@@ -181,7 +188,7 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedYear, selectedMonth]);
 
-  // Effect 2: inactive workers — reloads when groups or inactiveMonths changes
+  // Effect 2: last order per worker — reloads when groups change
   useEffect(() => {
     if (groups.length === 0) return;
     let cancelled = false;
@@ -190,36 +197,25 @@ export default function DashboardPage() {
       const supabase = createBrowserSupabaseClient();
       const groupIds = groups.map((g) => g.id);
 
-      const cutoff = new Date();
-      cutoff.setMonth(cutoff.getMonth() - inactiveMonths);
-      const cutoffStr = cutoff.toISOString().split("T")[0];
-
-      const PAGE = 1000;
-      const lom = new Map<string, string>();
-      let from = 0;
-      while (true) {
-        const { data } = await supabase
-          .from("orders")
-          .select("worker_id, order_date")
-          .in("group_id", groupIds)
-          .gte("order_date", cutoffStr)
-          .range(from, from + PAGE - 1);
-        for (const o of data ?? []) {
-          const existing = lom.get(o.worker_id);
-          if (!existing || o.order_date > existing) lom.set(o.worker_id, o.order_date);
-        }
-        if (!data || data.length < PAGE) break;
-        from += PAGE;
+      // Last order per worker over ALL orders (no date window), via worker_last_orders().
+      // The N-months cutoff is applied later, only to decide who is inactive.
+      try {
+        const last = await fetchWorkerLastOrders(supabase, groupIds);
+        if (cancelled) return;
+        const lom = new Map<string, string>();
+        for (const [workerId, v] of last) lom.set(workerId, v.lastOrder);
+        setLastOrderMap(lom);
+        setInactiveError(null);
+      } catch (e) {
+        if (cancelled) return;
+        // Never fall back to an empty map: every worker would be shown as "Nunca".
+        setInactiveError(e instanceof Error ? e.message : "Error al calcular la actividad");
       }
-
-      if (cancelled) return;
-      setLastOrderMap(lom);
       setLoadingInactive(false);
     }
     loadInactive();
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groups, inactiveMonths]);
+  }, [groups]);
 
   // Progress metrics for selected month
   const workdays = daysInMonth;
@@ -308,11 +304,7 @@ export default function DashboardPage() {
   const diffPct = totalPrev > 0 ? (((totalCurrent - totalPrev) / totalPrev) * 100).toFixed(1) : null;
 
   // Inactive workers
-  const cutoffDate = useMemo(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - inactiveMonths);
-    return d.toISOString().split("T")[0];
-  }, [inactiveMonths]);
+  const cutoffDate = useMemo(() => cutoffDateFor(inactiveMonths), [inactiveMonths]);
 
   const inactiveWorkers = useMemo(() => {
     return workers
@@ -594,7 +586,7 @@ export default function DashboardPage() {
                   onChange={(e) => setInactiveMonths(Number(e.target.value))}
                   className="rounded-md border border-input px-2 py-1 text-sm bg-white"
                 >
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                  {[1, 2, 3, 4, 5, 6, 12].map((n) => (
                     <option key={n} value={n}>{n} {n === 1 ? "mes" : "meses"}</option>
                   ))}
                 </select>
@@ -603,6 +595,13 @@ export default function DashboardPage() {
 
             {loadingInactive ? (
               <div className="text-center py-8 text-muted-foreground text-sm">Cargando...</div>
+            ) : inactiveError ? (
+              <Card>
+                <CardContent className="py-8 text-center text-red-600 text-sm">
+                  No se pudo calcular la actividad: {inactiveError}. Verifica que la función
+                  worker_last_orders exista en Supabase (supabase-worker-last-order.sql).
+                </CardContent>
+              </Card>
             ) : inactiveWorkers.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground text-sm">
@@ -629,7 +628,7 @@ export default function DashboardPage() {
                             </div>
                             <p className="text-xs text-muted-foreground">
                               {w.lastOrder
-                                ? `Último pedido: ${new Date(w.lastOrder + "T12:00:00").toLocaleDateString("es-PE")}`
+                                ? `Último pedido: ${formatOrderDate(w.lastOrder)}`
                                 : "Nunca"}
                             </p>
                           </div>

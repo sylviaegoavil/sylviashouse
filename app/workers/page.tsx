@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GroupSelector } from "@/components/GroupSelector";
+import { InactiveWorkersPanel } from "@/components/InactiveWorkersPanel";
 import {
   Card,
   CardContent,
@@ -51,6 +52,7 @@ export default function WorkersPage() {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<"list" | "inactive">("list");
 
   // Delete modal: worker + optional orderCount (set when API returns 409)
   const [deleteModal, setDeleteModal] = useState<{ worker: Worker; orderCount?: number } | null>(null);
@@ -266,7 +268,28 @@ export default function WorkersPage() {
         </div>
       </div>
 
+      {/* View toggle */}
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant={view === "list" ? "default" : "outline"}
+          onClick={() => setView("list")}
+        >
+          Lista
+        </Button>
+        <Button
+          size="sm"
+          variant={view === "inactive" ? "default" : "outline"}
+          onClick={() => setView("inactive")}
+        >
+          Sin actividad
+        </Button>
+      </div>
+
+      {view === "inactive" && <InactiveWorkersPanel groups={groups} />}
+
       {/* Filters */}
+      {view === "list" && (<>
       <Card>
         <CardContent className="pt-6">
           <div className="flex gap-4">
@@ -386,6 +409,7 @@ export default function WorkersPage() {
           </div>
         </CardContent>
       </Card>
+      </>)}
 
       {/* Delete confirmation modal */}
       {deleteModal && (
