@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -30,6 +31,8 @@ interface ParsePreviewProps {
   onToggleRepeated?: (key: string) => void;
   markedAsAdicional?: Set<number>; // indices in preview.matched (PRODUCCIÓN only)
   onToggleAdicional?: (idx: number) => void;
+  adicionalNotes?: Record<string, string>; // "a:<i>" auto-detected, "m:<idx>" marked (PRODUCCIÓN only)
+  onChangeAdicionalNote?: (key: string, value: string) => void;
 }
 
 // ─── Suggestion helpers (client-side, mirrors matcher logic) ─────────────────
@@ -209,12 +212,16 @@ function AdiccionalesProduccionView({
   matchedOrders,
   onRestoreOrder,
   onMarkAsAdicional,
+  adicionalNotes,
+  onChangeAdicionalNote,
 }: {
   adicionalesDetailed: AdicionalRecord[];
   markedAsAdicional?: Set<number>;
   matchedOrders: MatchResult[];
   onRestoreOrder?: (idx: number) => void;
   onMarkAsAdicional?: (idx: number) => void;
+  adicionalNotes?: Record<string, string>;
+  onChangeAdicionalNote?: (key: string, value: string) => void;
 }) {
   // Orders with "adicional" in text that matched a worker and are NOT yet marked
   const pendingReview = matchedOrders
@@ -324,6 +331,12 @@ function AdiccionalesProduccionView({
                     {order.parsedOrder.rawText}
                   </p>
                 </div>
+                <Input
+                  value={adicionalNotes?.[`m:${idx}`] ?? ""}
+                  onChange={(e) => onChangeAdicionalNote?.(`m:${idx}`, e.target.value)}
+                  placeholder="Nota (opcional)"
+                  className="h-8 text-xs max-w-[220px]"
+                />
                 <button
                   onClick={() => onRestoreOrder?.(idx)}
                   className="text-xs px-3 py-1.5 rounded border border-green-400 text-green-700 hover:bg-green-50 whitespace-nowrap shrink-0"
@@ -349,6 +362,7 @@ function AdiccionalesProduccionView({
                   <th className="py-2 px-3 text-left font-medium w-28">Fecha</th>
                   <th className="py-2 px-3 text-left font-medium w-12">Cant.</th>
                   <th className="py-2 px-3 text-left font-medium">Texto detectado</th>
+                  <th className="py-2 px-3 text-left font-medium w-56">Nota</th>
                 </tr>
               </thead>
               <tbody>
@@ -362,6 +376,14 @@ function AdiccionalesProduccionView({
                     </td>
                     <td className="py-2 px-3 text-muted-foreground text-xs break-words max-w-xs">
                       {rec.rawText.slice(0, 150)}{rec.rawText.length > 150 ? "…" : ""}
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <Input
+                        value={adicionalNotes?.[`a:${i}`] ?? ""}
+                        onChange={(e) => onChangeAdicionalNote?.(`a:${i}`, e.target.value)}
+                        placeholder="Nota (opcional)"
+                        className="h-8 text-xs"
+                      />
                     </td>
                   </tr>
                 ))}
@@ -377,7 +399,7 @@ function AdiccionalesProduccionView({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ParsePreview({ preview, workers = [], manualAssignments, onManualAssign, discardedRepeated, onToggleRepeated, markedAsAdicional, onToggleAdicional }: ParsePreviewProps) {
+export function ParsePreview({ preview, workers = [], manualAssignments, onManualAssign, discardedRepeated, onToggleRepeated, markedAsAdicional, onToggleAdicional, adicionalNotes, onChangeAdicionalNote }: ParsePreviewProps) {
   const { matched, unmatched, newWorkers, adicionales, adicionalesDetailed, errors, repeated, summary } =
     preview;
 
@@ -798,6 +820,8 @@ export function ParsePreview({ preview, workers = [], manualAssignments, onManua
                   matchedOrders={matched}
                   onRestoreOrder={onToggleAdicional}
                   onMarkAsAdicional={onToggleAdicional}
+                  adicionalNotes={adicionalNotes}
+                  onChangeAdicionalNote={onChangeAdicionalNote}
                 />
               ) : (
                 Object.keys(adicionales).length === 0 ? (

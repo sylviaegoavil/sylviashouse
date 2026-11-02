@@ -423,10 +423,23 @@ export function AttendanceGrid({
               {days.map((d, i) => {
                 const count = adicPerDay[i] || 0;
                 const waCount = adicWaPerDay[i] || 0;
-                const manualOrders = adicManualByDay.get(d) ?? [];
-                const needsTooltip = count > 0 && (waCount > 0 && manualOrders.length > 0 || manualOrders.some((o) => o.notes));
+                const dayAdic = adicManualByDay.get(d) ?? [];
+                // is_additional rows saved from the TXT (source='whatsapp') vs. added by hand ('manual')
+                const txtOrders = dayAdic.filter((o) => o.source === "whatsapp");
+                const manualOrders = dayAdic.filter((o) => o.source !== "whatsapp");
+                const needsTooltip = count > 0 && (
+                  (waCount > 0 || txtOrders.length > 0) && manualOrders.length > 0 ||
+                  dayAdic.some((o) => o.notes)
+                );
                 const tooltipLines: string[] = [`${count} adicional${count !== 1 ? "es" : ""}`];
                 if (waCount > 0) tooltipLines.push(`- WhatsApp: ${waCount}`);
+                if (txtOrders.length > 0) {
+                  const notes = txtOrders.flatMap((o) => (o.notes ? [o.notes] : []));
+                  tooltipLines.push(notes.length > 0
+                    ? `- TXT: ${txtOrders.length} — ${notes.join("; ")}`
+                    : `- TXT: ${txtOrders.length}`
+                  );
+                }
                 if (manualOrders.length > 0) {
                   const notes = manualOrders.flatMap((o) => (o.notes ? [o.notes] : []));
                   tooltipLines.push(notes.length > 0

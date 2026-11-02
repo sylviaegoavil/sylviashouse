@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       fileName,
       confirmedOrders,
       newWorkers,
-      adicionales,
+      confirmedAdicionales,
       replaceDuplicates,
     } = body;
 
@@ -122,10 +122,60 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── 3. Save adicionales as orders with worker_id = null or a special marker ──
-    // We store adicionales in the orders table with a note
-    // Actually, adicionales don't map to a specific worker. We'll store them
-    // in the processing_log and they'll show up in the attendance grid.
+    // ── 3. Save adicionales (PRODUCCIÓN) as orders: worker_id = null, is_additional = true ──
+    // TXT-origin rows use source='whatsapp'; manual ones ('manual') are never touched.
+    // Re-uploading replaces the TXT adicionales of every date covered by this upload.
+    let adicionalesCreated = 0;
+    if (confirmedAdicionales) {
+      const adicDates = [
+        ...new Set([
+          ...confirmedOrders.map((o) => o.date),
+          ...confirmedAdicionales.map((a) => a.date),
+        ]),
+      ];
+
+      if (adicDates.length > 0) {
+        const { error: delErr } = await supabase
+          .from("orders")
+          .delete()
+          .eq("group_id", groupId)
+          .eq("is_additional", true)
+          .eq("source", "whatsapp")
+          .is("worker_id", null)
+          .in("order_date", adicDates);
+
+        if (delErr) {
+          errors.push({
+            rawText: "",
+            date: "",
+            errorType: "bad_format",
+            message: `Error al limpiar adicionales previos: ${delErr.message}`,
+          });
+        }
+      }
+
+      if (confirmedAdicionales.length > 0) {
+        const rows = confirmedAdicionales.map((a) => ({
+          worker_id: null,
+          group_id: groupId,
+          order_date: a.date,
+          source: "whatsapp",
+          notes: a.note ? `${a.rawText} | Nota: ${a.note}` : a.rawText,
+          is_additional: true,
+        }));
+        const { error: adicErr } = await supabase.from("orders").insert(rows);
+        if (adicErr) {
+          errors.push({
+            rawText: "",
+            date: "",
+            errorType: "bad_format",
+            message: `Error al guardar adicionales: ${adicErr.message}`,
+          });
+        } else {
+          adicionalesCreated = rows.length;
+        }
+      }
+    }
 
     // ── 4. Create processing log ──
     const { data: log, error: logErr } = await supabase
@@ -163,6 +213,7 @@ export async function POST(request: NextRequest) {
     const result: ProcessOrdersResult = {
       ordersCreated,
       ordersReplaced,
+      adicionalesCreated,
       newWorkersAdded,
       processingLogId: log?.id || "",
       errors,

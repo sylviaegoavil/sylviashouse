@@ -21,6 +21,7 @@ import type {
   ProcessOrdersResult,
   UploadConfig,
   ConfirmedOrder,
+  ConfirmedAdicional,
   Group,
   Worker,
 } from "@/lib/types";
@@ -37,6 +38,8 @@ export default function UploadPage() {
   const [manualAssignments, setManualAssignments] = useState<Map<number, Worker>>(new Map());
   const [discardedRepeated, setDiscardedRepeated] = useState<Set<string>>(new Set());
   const [markedAsAdicional, setMarkedAsAdicional] = useState<Set<number>>(new Set());
+  // PRODUCCIÓN: optional notes per adicional. Keys: "a:<index in adicionalesDetailed>" / "m:<index in matched>"
+  const [adicionalNotes, setAdicionalNotes] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showDupWarning, setShowDupWarning] = useState(false);
@@ -100,6 +103,7 @@ export default function UploadPage() {
       setManualAssignments(new Map());
       setDiscardedRepeated(new Set());
       setMarkedAsAdicional(new Set());
+      setAdicionalNotes({});
       toast.success(
         `Procesado: ${data.summary.matchedCount} emparejados, ${data.summary.unmatchedCount} sin emparejar`
       );
@@ -149,6 +153,28 @@ export default function UploadPage() {
           adicionales[m.parsedOrder.date] = (adicionales[m.parsedOrder.date] || 0) + 1;
         }
 
+        // PRODUCCIÓN only: persist adicionales as orders (one row per unit).
+        // Other groups keep registering adicionales by hand to avoid double counting.
+        let confirmedAdicionales: ConfirmedAdicional[] | undefined;
+        if (/PRODUCC/i.test(preview.groupName)) {
+          confirmedAdicionales = [];
+          (preview.adicionalesDetailed ?? []).forEach((rec, i) => {
+            const note = adicionalNotes[`a:${i}`]?.trim() || null;
+            for (let k = 0; k < rec.count; k++) {
+              confirmedAdicionales!.push({ date: rec.date, rawText: rec.rawText, note });
+            }
+          });
+          for (const idx of markedAsAdicional) {
+            const m = preview.matched[idx];
+            if (!m) continue;
+            confirmedAdicionales.push({
+              date: m.parsedOrder.date,
+              rawText: m.parsedOrder.rawText,
+              note: adicionalNotes[`m:${idx}`]?.trim() || null,
+            });
+          }
+        }
+
         const manualOrders: ConfirmedOrder[] = Array.from(manualAssignments.entries()).map(
           ([idx, worker]) => ({
             workerId: worker.id,
@@ -170,6 +196,7 @@ const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
             confirmedOrders,
             newWorkers: preview.newWorkers,
             adicionales,
+            confirmedAdicionales,
             replaceDuplicates,
           }),
         });
@@ -191,8 +218,14 @@ const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
         setSaving(false);
       }
     },
-    [preview, manualAssignments, discardedRepeated, markedAsAdicional]
+    [preview, manualAssignments, discardedRepeated, markedAsAdicional, adicionalNotes]
   );
+
+  // PRODUCCIÓN: adicionales that will be saved (auto-detected units + marked from Emparejados)
+  const adicionalesToSave =
+    preview && /PRODUCC/i.test(preview.groupName)
+      ? (preview.adicionalesDetailed ?? []).reduce((s, r) => s + r.count, 0) + markedAsAdicional.size
+      : 0;
 
   // Confirm save — check for duplicates first
   const handleConfirmSave = useCallback(() => {
@@ -294,6 +327,10 @@ const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
                   return next;
                 });
               }}
+              adicionalNotes={adicionalNotes}
+              onChangeAdicionalNote={(key, value) =>
+                setAdicionalNotes((prev) => ({ ...prev, [key]: value }))
+              }
               markedAsAdicional={markedAsAdicional}
               onToggleAdicional={(idx) => {
                 setMarkedAsAdicional((prev) => {
@@ -326,7 +363,8 @@ const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
               ) : (
                 <>
                   <CheckCircle className="mr-2 h-4 w-4" />
-                  Confirmar y guardar ({preview.matched.length + manualAssignments.size - discardedRepeated.size - markedAsAdicional.size} pedidos)
+                  Confirmar y guardar ({preview.matched.length + manualAssignments.size - discardedRepeated.size - markedAsAdicional.size} pedidos
+                  {adicionalesToSave > 0 ? ` + ${adicionalesToSave} adicionales` : ""})
                 </>
               )}
             </Button>
@@ -345,6 +383,9 @@ const confirmedOrders: ConfirmedOrder[] = [...autoOrders, ...manualOrders];
           <CardContent className="space-y-2">
             <p>Pedidos creados: <strong>{result.ordersCreated}</strong></p>
             <p>Pedidos reemplazados: <strong>{result.ordersReplaced}</strong></p>
+            {(result.adicionalesCreated ?? 0) > 0 && (
+              <p>Adicionales guardados: <strong>{result.adicionalesCreated}</strong></p>
+            )}
             <p>
               Nuevos trabajadores: <strong>{result.newWorkersAdded}</strong>
             </p>

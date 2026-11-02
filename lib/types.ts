@@ -180,7 +180,15 @@ export interface ProcessOrdersRequest {
   confirmedOrders: ConfirmedOrder[];
   newWorkers: DetectedNewWorker[];
   adicionales: Record<string, number>;
+  /** PRODUCCIÓN only: one entry per adicional unit, persisted as orders(is_additional=true, worker_id=null). */
+  confirmedAdicionales?: ConfirmedAdicional[];
   replaceDuplicates: boolean;
+}
+
+export interface ConfirmedAdicional {
+  date: string;
+  rawText: string;
+  note: string | null;
 }
 
 export interface ConfirmedOrder {
@@ -194,6 +202,7 @@ export interface ConfirmedOrder {
 export interface ProcessOrdersResult {
   ordersCreated: number;
   ordersReplaced: number;
+  adicionalesCreated?: number;
   newWorkersAdded: number;
   processingLogId: string;
   errors: ParseErrorEntry[];
